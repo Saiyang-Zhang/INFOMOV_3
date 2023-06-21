@@ -46,70 +46,92 @@ float3 Renderer::DirectIllumination( const float3& I, const float3& N )
 // -----------------------------------------------------------
 // Evaluate light transport
 // -----------------------------------------------------------
-float3 Renderer::Trace( Ray& ray, int depth )
+float3 Renderer::Trace(Ray& ray, int depth)
 {
-	// intersect the ray with the scene
-	scene.FindNearest( ray );
-	if (ray.objIdx == -1) /* ray left the scene */ return 0;
-	if (depth > MAXDEPTH) /* bouned too many times */ return 0;
-	// gather shading data
-	float3 I = ray.O + ray.t * ray.D;
-	float3 N = scene.GetNormal( ray.objIdx, I, ray.D );
-	float3 albedo = scene.GetAlbedo( ray.objIdx, I );
-	// do whitted
-	float3 out_radiance( 0 );
-	float reflectivity = scene.GetReflectivity( ray.objIdx, I );
-	float refractivity = scene.GetRefractivity( ray.objIdx, I );
-	float diffuseness = 1 - (reflectivity + refractivity);
-	// handle pure speculars such as mirrors
-	if (reflectivity > 0)
-	{
-		float3 R = reflect( ray.D, N );
-		Ray r( I + R * EPSILON, R );
-		out_radiance += reflectivity * albedo * Trace( r, depth + 1 );
-	}
-	// handle dielectrics such as glass / water
-	if (refractivity > 0)
-	{
-		float3 R = reflect( ray.D, N );
-		Ray r( I + R * EPSILON, R );
-		float n1 = ray.inside ? 1.2f : 1, n2 = ray.inside ? 1 : 1.2f;
-		float eta = n1 / n2, cosi = dot( -ray.D, N );
-		float cost2 = 1.0f - eta * eta * (1 - cosi * cosi);
-		float Fr = 1;
-		if (cost2 > 0)
-		{
-			float a = n1 - n2, b = n1 + n2, R0 = (a * a) / (b * b), c = 1 - cosi;
-			Fr = R0 + (1 - R0) * (c * c * c * c * c);
-			float3 T = eta * ray.D + ((eta * cosi - sqrtf( fabs( cost2 ) )) * N);
-			Ray t( I + T * EPSILON, T );
-			t.inside = !ray.inside;
-			out_radiance += albedo * (1 - Fr) * Trace( t, depth + 1 );
-		}
-		out_radiance += albedo * Fr * Trace( r, depth + 1 );
-	}
-	// handle diffuse surfaces
-	if (diffuseness > 0)
-	{
-		// calculate illumination
-		float3 irradiance = DirectIllumination( I, N );
-		// we don't account for diffuse interreflections: approximate
-		float3 ambient = float3( 0.2f, 0.2f, 0.2f );
-		// calculate reflected radiance using Lambert brdf
-		float3 brdf = albedo * INVPI;
-		out_radiance += diffuseness * brdf * (irradiance + ambient);
-	}
-	// apply absorption if we travelled through a medium
-	float3 medium_scale( 1 );
-	if (ray.inside)
-	{
-		float3 absorption = float3( 0.5f, 0, 0.5f ); // scene.GetAbsorption( objIdx );
-		medium_scale.x = expf( absorption.x * -ray.t );
-		medium_scale.y = expf( absorption.y * -ray.t );
-		medium_scale.z = expf( absorption.z * -ray.t );
-	}
-	return medium_scale * out_radiance;
+    float3 accumulated_radiance(0);
+    float3 medium_scale(1);
+
+    for (int i = 0; i < MAXDEPTH; ++i)
+    {
+        // Intersect the ray with the scene
+        scene.FindNearest(ray);
+        if (ray.objIdx == -1) /* ray left the scene */
+            break;
+
+        if (depth > MAXDEPTH) /* bounded too many times */
+            break;
+
+        // Gather shading data
+        float3 I = ray.O + ray.t * ray.D;
+        float3 N = scene.GetNormal(ray.objIdx, I, ray.D);
+        float3 albedo = scene.GetAlbedo(ray.objIdx, I);
+        float reflectivity = scene.GetReflectivity(ray.objIdx, I);
+        float refractivity = scene.GetRefractivity(ray.objIdx, I);
+        float diffuseness = 1 - (reflectivity + refractivity);
+
+        // Do whitted
+        float3 out_radiance(0);
+
+        // Handle pure speculars such as mirrors
+        if (reflectivity > 0)
+        {
+            float3 R = reflect(ray.D, N);
+            Ray r(I + R * EPSILON, R);
+            ray = r;
+            accumulated_radiance += reflectivity * albedo * out_radiance;
+            continue;
+        }
+
+        // Handle dielectrics such as glass / water
+        if (refractivity > 0)
+        {
+            float3 R = reflect(ray.D, N);
+            Ray r(I + R * EPSILON, R);
+            float n1 = ray.inside ? 1.2f : 1, n2 = ray.inside ? 1 : 1.2f;
+            float eta = n1 / n2, cosi = dot(-ray.D, N);
+            float cost2 = 1.0f - eta * eta * (1 - cosi * cosi);
+            float Fr = 1;
+            if (cost2 > 0)
+            {
+                float a = n1 - n2, b = n1 + n2, R0 = (a * a) / (b * b), c = 1 - cosi;
+                Fr = R0 + (1 - R0) * (c * c * c * c * c);
+                float3 T = eta * ray.D + ((eta * cosi - sqrtf(fabs(cost2))) * N);
+                Ray t(I + T * EPSILON, T);
+                t.inside = !ray.inside;
+                ray = t;
+                accumulated_radiance += albedo * (1 - Fr) * out_radiance;
+                continue;
+            }
+            accumulated_radiance += albedo * Fr * out_radiance;
+        }
+
+        // Handle diffuse surfaces
+        if (diffuseness > 0)
+        {
+            // Calculate illumination
+            float3 irradiance = DirectIllumination(I, N);
+            // We don't account for diffuse interreflections: approximate
+            float3 ambient = float3(0.2f, 0.2f, 0.2f);
+            // Calculate reflected radiance using Lambert brdf
+            float3 brdf = albedo * INVPI;
+            accumulated_radiance += diffuseness * brdf * (irradiance + ambient);
+        }
+
+        // Apply absorption if we traveled through a medium
+        if (ray.inside)
+        {
+            float3 absorption = float3(0.5f, 0, 0.5f); // scene.GetAbsorption( objIdx );
+            medium_scale.x = expf(absorption.x * -ray.t);
+            medium_scale.y = expf(absorption.y * -ray.t);
+            medium_scale.z = expf(absorption.z * -ray.t);
+        }
+
+        break;
+    }
+
+    return medium_scale * accumulated_radiance;
 }
+
 
 // -----------------------------------------------------------
 // Main application tick function - Executed once per frame
