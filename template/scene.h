@@ -1,4 +1,4 @@
-#pragma once
+                         #pragma once
 
 // -----------------------------------------------------------
 // scene.h
@@ -19,39 +19,20 @@
 // -----------------------------------------------------------
 
 // INFOMOV'23: don't disable these
-#define SPEEDTRIX
+// #define SPEEDTRIX
 #define FOURLIGHTS
 #define USEBVH
 
-#define PLANE_X(o,i) {t=-(ray.O.x+o)*ray.rD.x;if(t<ray.t&&t>0)ray.t=t,ray.objIdx=i;}
-#define PLANE_Y(o,i) {t=-(ray.O.y+o)*ray.rD.y;if(t<ray.t&&t>0)ray.t=t,ray.objIdx=i;}
-#define PLANE_Z(o,i) {t=-(ray.O.z+o)*ray.rD.z;if(t<ray.t&&t>0)ray.t=t,ray.objIdx=i;}
+#define PLANE_X(o,i) {float t=-(ray.O.x+o)*ray.rD.x;if(t<ray.t&&t>0)ray.t=t,ray.objIdx=i;}
+#define PLANE_Y(o,i) {float t=-(ray.O.y+o)*ray.rD.y;if(t<ray.t&&t>0)ray.t=t,ray.objIdx=i;}
+#define PLANE_Z(o,i) {float t=-(ray.O.z+o)*ray.rD.z;if(t<ray.t&&t>0)ray.t=t,ray.objIdx=i;}
 
 namespace Tmpl8 {
 
-__declspec(align(64)) class Ray
+	struct Ray
 {
-public:
-	Ray() = default;
-	Ray( const float3 origin, const float3 direction, const float distance = 1e34f, const int idx = -1 )
-	{
-		O = origin, D = direction, t = distance;
-		// calculate reciprocal ray direction for triangles and AABBs
-		rD = float3( 1 / D.x, 1 / D.y, 1 / D.z );
-	#ifdef SPEEDTRIX
-		d0 = 1, d1 = d2 = 0; // ready for SIMD matrix math
-	#endif
-		objIdx = idx;
-	}
-	float3 IntersectionPoint() const { return O + t * D; }
 	// ray data
-#ifndef SPEEDTRIX
 	float3 O, D, rD;
-#else
-	union { struct { float3 O; float d0; }; __m128 O4; };
-	union { struct { float3 D; float d1; }; __m128 D4; };
-	union { struct { float3 rD; float d2; }; __m128 rD4; };
-#endif
 	float t = 1e34f;
 	int objIdx = -1;
 	bool inside = false; // true when in medium
@@ -196,33 +177,6 @@ public:
 	{
 		// 'rotate' the cube by transforming the ray into object space
 		// using the inverse of the cube transform.
-	#ifdef SPEEDTRIX
-		// an AABB can be efficiently tested with SIMD - and matrix math is easy too. Profit!
-		const __m128 a4 = ray.O4, b4 = ray.D4;
-		__m128 v0 = _mm_mul_ps( a4, _mm_load_ps( &invM.cell[0] ) ), v1 = _mm_mul_ps( a4, _mm_load_ps( &invM.cell[4] ) );
-		__m128 v2 = _mm_mul_ps( a4, _mm_load_ps( &invM.cell[8] ) ), v3 = _mm_mul_ps( a4, _mm_load_ps( &invM.cell[12] ) );
-		_MM_TRANSPOSE4_PS( v0, v1, v2, v3 );
-		__m128 o4 = _mm_add_ps( _mm_add_ps( v0, v1 ), _mm_add_ps( v2, v3 ) );
-		__m128 v4 = _mm_mul_ps( b4, _mm_load_ps( &invM.cell[0] ) ), v5 = _mm_mul_ps( b4, _mm_load_ps( &invM.cell[4] ) );
-		__m128 v6 = _mm_mul_ps( b4, _mm_load_ps( &invM.cell[8] ) ), v7 = _mm_mul_ps( b4, _mm_load_ps( &invM.cell[12] ) );
-		_MM_TRANSPOSE4_PS( v4, v5, v6, v7 );
-		__m128 d4 = _mm_add_ps( _mm_add_ps( v4, v5 ), v6 );
-		__m128 rd4 = _mm_div_ps( _mm_set1_ps( 1.0f ), d4 ); // _mm_rcp_ps( d4 ); // reduced precision unsufficient?
-		// AABB test
-		__m128 t1 = _mm_mul_ps( _mm_sub_ps( bmin4, o4 ), rd4 );
-		__m128 t2 = _mm_mul_ps( _mm_sub_ps( bmax4, o4 ), rd4 );
-		__m128 vmax4 = _mm_max_ps( t1, t2 ), vmin4 = _mm_min_ps( t1, t2 );
-		float tmax = min( vmax4.m128_f32[0], min( vmax4.m128_f32[1], vmax4.m128_f32[2] ) );
-		float tmin = max( vmin4.m128_f32[0], max( vmin4.m128_f32[1], vmin4.m128_f32[2] ) );
-		if (tmin < tmax) if (tmin > 0)
-		{
-			if (tmin < ray.t) ray.t = tmin, ray.objIdx = objIdx;
-		}
-		else if (tmax > 0)
-		{
-			if (tmax < ray.t) ray.t = tmax, ray.objIdx = objIdx;
-		}
-	#else
 		float3 O = TransformPosition( ray.O, invM );
 		float3 D = TransformVector( ray.D, invM );
 		float rDx = 1 / D.x, rDy = 1 / D.y, rDz = 1 / D.z;
@@ -245,32 +199,11 @@ public:
 		{
 			if (tmax < ray.t) ray.t = tmax, ray.objIdx = objIdx;
 		}
-	#endif
 	}
 	bool IsOccluded( const Ray& ray ) const
 	{
-	#ifdef SPEEDTRIX
-	// an AABB can be efficiently tested with SIMD - and matrix math is easy too. Profit!
-		const __m128 a4 = ray.O4, b4 = ray.D4;
-		__m128 v0 = _mm_mul_ps( a4, _mm_load_ps( &invM.cell[0] ) ), v1 = _mm_mul_ps( a4, _mm_load_ps( &invM.cell[4] ) );
-		__m128 v2 = _mm_mul_ps( a4, _mm_load_ps( &invM.cell[8] ) ), v3 = _mm_mul_ps( a4, _mm_load_ps( &invM.cell[12] ) );
-		_MM_TRANSPOSE4_PS( v0, v1, v2, v3 );
-		__m128 o4 = _mm_add_ps( _mm_add_ps( v0, v1 ), _mm_add_ps( v2, v3 ) );
-		__m128 v4 = _mm_mul_ps( b4, _mm_load_ps( &invM.cell[0] ) ), v5 = _mm_mul_ps( b4, _mm_load_ps( &invM.cell[4] ) );
-		__m128 v6 = _mm_mul_ps( b4, _mm_load_ps( &invM.cell[8] ) ), v7 = _mm_mul_ps( b4, _mm_load_ps( &invM.cell[12] ) );
-		_MM_TRANSPOSE4_PS( v4, v5, v6, v7 );
-		__m128 d4 = _mm_add_ps( _mm_add_ps( v4, v5 ), v6 );
-		__m128 rd4 = _mm_div_ps( _mm_set1_ps( 1.0f ), d4 ); // _mm_rcp_ps( d4 ); // reduced precision unsufficient?
-		// AABB test
-		__m128 t1 = _mm_mul_ps( _mm_sub_ps( bmin4, o4 ), rd4 );
-		__m128 t2 = _mm_mul_ps( _mm_sub_ps( bmax4, o4 ), rd4 );
-		__m128 vmax4 = _mm_max_ps( t1, t2 ), vmin4 = _mm_min_ps( t1, t2 );
-		float tmax = min( vmax4.m128_f32[0], min( vmax4.m128_f32[1], vmax4.m128_f32[2] ) );
-		float tmin = max( vmin4.m128_f32[0], max( vmin4.m128_f32[1], vmin4.m128_f32[2] ) );
-		return tmax > 0 && tmin < tmax&& tmin < ray.t;
-	#else
-		float3 O = TransformPosition_SSE( ray.O4, invM );
-		float3 D = TransformVector_SSE( ray.D4, invM );
+		float3 O = TransformPosition( ray.O, invM );
+		float3 D = TransformVector( ray.D, invM );
 		float rDx = 1 / D.x, rDy = 1 / D.y, rDz = 1 / D.z;
 		float t1 = (b[0].x - O.x) * rDx, t2 = (b[1].x - O.x) * rDx;
 		float t3 = (b[0].y - O.y) * rDy, t4 = (b[1].y - O.y) * rDy;
@@ -278,7 +211,6 @@ public:
 		float tmin = max( max( min( t1, t2 ), min( t3, t4 ) ), min( t5, t6 ) );
 		float tmax = min( min( max( t1, t2 ), max( t3, t4 ) ), max( t5, t6 ) );
 		return tmax > 0 && tmin < tmax&& tmin < ray.t;
-	#endif
 	}
 	float3 GetNormal( const float3 I ) const
 	{
@@ -387,8 +319,8 @@ public:
 	void Intersect( Ray& ray ) const
 	{
 		// via: https://www.shadertoy.com/view/4sBGDy
-		float3 O = TransformPosition_SSE( ray.O4, invT );
-		float3 D = TransformVector_SSE( ray.D4, invT );
+		float3 O = TransformPosition( ray.O, invT );
+		float3 D = TransformVector( ray.D, invT );
 		// extension rays need double precision for the quadratic solver!
 		double po = 1, m = dot( O, O ), k3 = dot( O, D ), k32 = k3 * k3;
 		// bounding sphere test
@@ -455,8 +387,8 @@ public:
 	bool IsOccluded( const Ray& ray ) const
 	{
 		// via: https://www.shadertoy.com/view/4sBGDy
-		float3 O = TransformPosition_SSE( ray.O4, invT );
-		float3 D = TransformVector_SSE( ray.D4, invT );
+		float3 O = TransformPosition( ray.O, invT );
+		float3 D = TransformVector( ray.D, invT );
 		float po = 1, m = dot( O, O ), k3 = dot( O, D ), k32 = k3 * k3;
 		// bounding sphere test
 		float v = k32 - m + r2;
@@ -674,81 +606,23 @@ public:
 	void FindNearest( Ray& ray ) const
 	{
 		// room walls - ugly shortcut for more speed
-	#ifdef SPEEDTRIX
-		// prefetching
-		const float3 spos = sphere.pos;
-		const float3 ro = ray.O, rd = ray.D;
-		// TODO: the room is actually just an AABB; use slab test
-		static const __m128 x4min = _mm_setr_ps( 3, 1, 3, 1e30f );
-		static const __m128 x4max = _mm_setr_ps( -2.99f, -2, -3.99f, 1e30f );
-		static const __m128 idmin = _mm_castsi128_ps( _mm_setr_epi32( 4, 6, 8, -1 ) );
-		static const __m128 idmax = _mm_castsi128_ps( _mm_setr_epi32( 5, 7, 9, -1 ) );
-		static const __m128 zero4 = _mm_setzero_ps();
-		const __m128 selmask = _mm_cmpge_ps( ray.D4, zero4 );
-		const __m128i idx4 = _mm_castps_si128( _mm_blendv_ps( idmin, idmax, selmask ) );
-		const __m128 x4 = _mm_blendv_ps( x4min, x4max, selmask );
-		const __m128 d4 = _mm_sub_ps( zero4, _mm_mul_ps( _mm_add_ps( ray.O4, x4 ), ray.rD4 ) );
-		const __m128 mask4 = _mm_cmple_ps( d4, zero4 );
-		const __m128 t4 = _mm_blendv_ps( d4, _mm_set1_ps( 1e34f ), mask4 );
-		/* first: unconditional */  ray.t = t4.m128_f32[0], ray.objIdx = idx4.m128i_i32[0];
-		if (t4.m128_f32[1] < ray.t) ray.t = t4.m128_f32[1], ray.objIdx = idx4.m128i_i32[1];
-		if (t4.m128_f32[2] < ray.t) ray.t = t4.m128_f32[2], ray.objIdx = idx4.m128i_i32[2];
-	#else
 		if (ray.D.x < 0) PLANE_X( 3, 4 ) else PLANE_X( -2.99f, 5 );
 		if (ray.D.y < 0) PLANE_Y( 1, 6 ) else PLANE_Y( -2, 7 );
 		if (ray.D.z < 0) PLANE_Z( 3, 8 ) else PLANE_Z( -3.99f, 9 );
-	#endif
 	#ifdef FOURLIGHTS
 		for (int i = 0; i < 4; i++) quad[i].Intersect( ray );
 	#else
 		quad.Intersect( ray );
 	#endif
-	#ifdef SPEEDTRIX // hardcoded spheres, a bit faster this way but very ugly
-		{
-			const float3 oc = ro - spos;
-			const float b = dot( oc, rd ), c = dot( oc, oc ) - (0.6f * 0.6f);
-			const float d = b * b - c;
-			if (d > 0)
-			{
-				const float t = -b - sqrtf( d );
-				const bool hit = t < ray.t&& t > 0;
-				if (hit) ray.t = t, ray.objIdx = 1;
-			}
-		}
-		{
-			const float3 oc = ro - float3( 0, 2.5f, -3.07f );
-			const float b = dot( oc, rd ), c = dot( oc, oc ) - (8 * 8);
-			const float d = b * b - c;
-			if (d > 0)
-			{
-				float t = sqrtf( d ) - b;
-				const bool hit = t < ray.t&& t > 0;
-				if (hit) ray.t = t, ray.objIdx = 2;
-			}
-		}
-	#else
 		sphere.Intersect( ray );
 		sphere2.Intersect( ray );
-	#endif
 		cube.Intersect( ray );
 		torus.Intersect( ray );
 	}
 	bool IsOccluded( const Ray& ray ) const
 	{
 		if (cube.IsOccluded( ray )) return true;
-	#ifdef SPEEDTRIX
-		const float3 oc = ray.O - sphere.pos;
-		const float b = dot( oc, ray.D ), c = dot( oc, oc ) - (0.6f * 0.6f);
-		const float d = b * b - c;
-		if (d > 0)
-		{
-			const float t = -b - sqrtf( d );
-			const bool hit = t < ray.t&& t > 0;
-			if (hit) return true;
-		}
-	#else
 		if (sphere.IsOccluded( ray )) return true;
-	#endif
 	#ifdef FOURLIGHTS
 		for (int i = 0; i < 4; i++) if (quad[i].IsOccluded( ray )) return true;
 	#else

@@ -20,14 +20,6 @@ public:
 		topRight = float3( aspect, 1, 0 );
 		bottomLeft = float3( -aspect, -1, 0 );
 	}
-	Ray GetPrimaryRay( const float x, const float y )
-	{
-		// calculate pixel position on virtual screen plane
-		const float u = (float)x * (1.0f / SCRWIDTH);
-		const float v = (float)y * (1.0f / SCRHEIGHT);
-		const float3 P = topLeft + u * (topRight - topLeft) + v * (bottomLeft - topLeft);
-		return Ray( camPos, normalize( P - camPos ) );
-	}
 	bool HandleInput( const float t )
 	{
 		if (!WindowHasFocus()) return false;

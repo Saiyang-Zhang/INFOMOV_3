@@ -1,0 +1,134 @@
+[0623/232623.956:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232624.470:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232624.471:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232624.484:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232624.498:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232624.505:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232624.513:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232624.520:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232624.533:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232624.540:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232624.549:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232624.556:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232624.569:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232624.592:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232624.606:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232626.044:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232644.551:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232644.881:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232644.882:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232644.896:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232644.919:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232644.926:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232644.947:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232644.961:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232644.962:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232644.964:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232644.968:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232644.976:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232645.719:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232707.571:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232735.386:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232749.184:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232759.215:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232800.556:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232800.751:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232819.245:ERROR:gpu_init.cc(453)] Passthrough is not supported, GL is disabled, ANGLE is 
+[0623/232901.775:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232901.922:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232901.925:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232901.959:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232902.271:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232902.445:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232925.991:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232927.088:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232927.090:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232949.001:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232951.262:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232951.573:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232951.583:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232951.593:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232951.605:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232951.624:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/232951.640:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233021.991:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233024.040:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233024.052:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233026.285:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233026.285:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233026.294:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233034.367:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233034.368:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233034.385:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233034.397:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233034.417:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233034.428:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233034.440:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233034.453:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233034.464:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233034.471:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233034.483:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233034.491:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233034.506:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233034.514:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233034.530:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233034.542:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233034.556:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233034.565:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233034.581:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233034.600:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233034.619:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233034.631:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233034.638:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233042.645:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233119.112:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233139.966:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233139.967:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233139.980:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233147.855:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233620.388:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233620.399:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233620.408:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233631.964:ERROR:ssl_client_socket_impl.cc(981)] handshake failed; returned -1, SSL error code 1, net_error -202
+[0623/233729.867:ERROR:network_service_instance_impl.cc(333)] Network service crashed, restarting service.
+[0623/233730.136:ERROR:network_service_instance_impl.cc(333)] Network service crashed, restarting service.
+[0623/233730.220:ERROR:network_service_instance_impl.cc(333)] Network service crashed, restarting service.
+[0623/233730.271:ERROR:network_service_instance_impl.cc(333)] Network service crashed, restarting service.
+[0623/233730.367:ERROR:network_service_instance_impl.cc(333)] Network service crashed, restarting service.
+[0623/233730.425:ERROR:network_service_instance_impl.cc(333)] Network service crashed, restarting service.
+[0623/233730.471:ERROR:network_service_instance_impl.cc(333)] Network service crashed, restarting service.
+[0623/233730.510:ERROR:network_service_instance_impl.cc(333)] Network service crashed, restarting service.
+[0623/233730.541:ERROR:network_service_instance_impl.cc(333)] Network service crashed, restarting service.
+[0623/233730.571:ERROR:network_service_instance_impl.cc(333)] Network service crashed, restarting service.
+[0623/233730.606:ERROR:network_service_instance_impl.cc(333)] Network service crashed, restarting service.
+[0623/233730.637:ERROR:network_service_instance_impl.cc(333)] Network service crashed, restarting service.
+[0623/233730.682:ERROR:network_service_instance_impl.cc(333)] Network service crashed, restarting service.
+[0623/233730.721:ERROR:network_service_instance_impl.cc(333)] Network service crashed, restarting service.
+[0623/233730.756:ERROR:network_service_instance_impl.cc(333)] Network service crashed, restarting service.
+[0623/233730.763:ERROR:gpu_process_host.cc(956)] GPU process exited unexpectedly: exit_code=1073807364
+[0623/233730.763:WARNING:gpu_process_host.cc(1269)] The GPU process has crashed 1 time(s)
+[0623/233730.790:ERROR:network_service_instance_impl.cc(333)] Network service crashed, restarting service.
+[0623/233730.799:ERROR:gpu_process_host.cc(956)] GPU process exited unexpectedly: exit_code=-1073741205
+[0623/233730.799:WARNING:gpu_process_host.cc(1269)] The GPU process has crashed 2 time(s)
+[0623/233730.823:ERROR:network_service_instance_impl.cc(333)] Network service crashed, restarting service.
+[0623/233730.832:ERROR:gpu_process_host.cc(956)] GPU process exited unexpectedly: exit_code=-1073741205
+[0623/233730.832:WARNING:gpu_process_host.cc(1269)] The GPU process has crashed 3 time(s)
+[0623/233730.858:ERROR:network_service_instance_impl.cc(333)] Network service crashed, restarting service.
+[0623/233730.862:ERROR:gpu_process_host.cc(956)] GPU process exited unexpectedly: exit_code=-1073741205
+[0623/233730.862:WARNING:gpu_process_host.cc(1269)] The GPU process has crashed 4 time(s)
+[0623/233730.884:ERROR:network_service_instance_impl.cc(333)] Network service crashed, restarting service.
+[0623/233730.893:ERROR:gpu_process_host.cc(956)] GPU process exited unexpectedly: exit_code=-1073741205
+[0623/233730.893:WARNING:gpu_process_host.cc(1269)] The GPU process has crashed 5 time(s)
+[0623/233730.911:ERROR:network_service_instance_impl.cc(333)] Network service crashed, restarting service.
+[0623/233730.919:ERROR:gpu_process_host.cc(956)] GPU process exited unexpectedly: exit_code=-1073741205
+[0623/233730.919:WARNING:gpu_process_host.cc(1269)] The GPU process has crashed 6 time(s)
+[0623/233730.938:ERROR:network_service_instance_impl.cc(333)] Network service crashed, restarting service.
+[0623/233730.944:ERROR:gpu_process_host.cc(956)] GPU process exited unexpectedly: exit_code=-1073741205
+[0623/233730.945:WARNING:gpu_process_host.cc(1269)] The GPU process has crashed 7 time(s)
+[0623/233730.966:ERROR:network_service_instance_impl.cc(333)] Network service crashed, restarting service.
+[0623/233730.971:ERROR:gpu_process_host.cc(956)] GPU process exited unexpectedly: exit_code=-1073741205
+[0623/233730.971:WARNING:gpu_process_host.cc(1269)] The GPU process has crashed 8 time(s)
+[0623/233730.991:ERROR:network_service_instance_impl.cc(333)] Network service crashed, restarting service.
+[0623/233730.997:ERROR:gpu_process_host.cc(956)] GPU process exited unexpectedly: exit_code=-1073741205
+[0623/233730.998:WARNING:gpu_process_host.cc(1269)] The GPU process has crashed 9 time(s)
+[0623/233730.998:FATAL:gpu_data_manager_impl_private.cc(417)] GPU process isn't usable. Goodbye.
