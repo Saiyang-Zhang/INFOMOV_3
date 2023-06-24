@@ -36,6 +36,21 @@ public:
 	float anim_time = 0;
 	// fps smoothing
 	float avg = 10, alpha = 1;
+
+	Ray GetRay(const float3 origin, const float3 direction, const float distance, const int idx);
+	Ray GetPrimaryRay(float x, float y, float* camera_params);
+
+	float camera_params[12];
+	uint accum[SCRWIDTH * SCRHEIGHT];
+
+	Kernel* kernel_test = nullptr;
+	Kernel* kernel_trace = nullptr;
+
+	Buffer* buffer_accumulator = nullptr;
+	Buffer* buffer_camera = nullptr;
+	Buffer* buffer_logo = nullptr;
+	Buffer* buffer_red = nullptr;
+	Buffer* buffer_blue = nullptr;
 };
 
 } // namespace Tmpl8

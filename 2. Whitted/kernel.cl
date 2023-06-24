@@ -690,5 +690,5 @@ __kernel void Trace(float t, __global uint* accumulator,  __global float* camera
 	torus.T = mat4Mul( Translate( -0.25f, 0, 2), RotateX( PI / 4 ) );
 	torus.invT = Inverted( torus.T );
 
-	bool flag = IsOccludedSphere( &sphere, &ray);
+	//bool flag = IsOccludedSphere( &sphere, &ray);
 }
