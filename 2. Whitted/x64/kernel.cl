@@ -16,17 +16,6 @@
 
 float3 camPos, topLeft, topRight, bottomLeft;
 
-struct test
-{
-	float x, y;
-};
-
-__kernel void test(__global float* a)
-{
-	int idx = get_global_id( 0 );
-	int idy = get_global_id( 1 );
-}
-
 struct mat4
 {
 	float cell[16];
@@ -96,6 +85,7 @@ struct mat4 mat4Mul( struct mat4 a, struct mat4 b )
 				(a.cell[i + 2] * b.cell[j + 8]) +
 				(a.cell[i + 3] * b.cell[j + 12]);
 		}
+	return r;
 }
 struct mat4 Inverted( struct mat4 a )
 {
@@ -168,7 +158,6 @@ inline uint RGBF32_to_RGB8( float3 v )
 }
 inline float3 reflect( float3 i, float3 n ) { return i - 2.0f * n * dot( n, i ); }
 
-
 struct Ray
 {
 	// ray data
@@ -176,8 +165,10 @@ struct Ray
 	float t;
 	int objIdx;
 	bool inside; // true when in medium
+	float3 rate;
+	int depth;
 };
-struct Ray GetRay(float3 origin, float3 direction, float distance, int idx)
+struct Ray GetRay(float3 origin, float3 direction, float3 rate, int depth, float distance, int idx)
 {
 	struct Ray ray;
 	ray.O = origin;
@@ -186,16 +177,17 @@ struct Ray GetRay(float3 origin, float3 direction, float distance, int idx)
 	ray.objIdx = idx;
 	ray.inside = false;
 	ray.rD.x = 1 / ray.D.x, ray.rD.y = 1 / ray.D.y, ray.rD.z = 1 / ray.D.z;
+	ray.rate = rate, ray.depth = depth;
 	return ray;
 }
-struct Ray GetPrimaryRay(float x, float y) 
+struct Ray GetPrimaryRay(float x, float y, float3 rate, int depth) 
 {
 	// calculate pixel position on virtual screen plane
 	const float u = (float)x * (1.0f / SCRWIDTH);
 	const float v = (float)y * (1.0f / SCRHEIGHT);
 	const float3 P = topLeft + u * (topRight - topLeft) + v * (bottomLeft - topLeft);
 
-	return GetRay(camPos, normalize( P - camPos ), INFTY, -1);
+	return GetRay(camPos, normalize( P - camPos ), rate, depth, INFTY, -1);
 }
 
 
@@ -498,7 +490,7 @@ struct Torus GetTorus( int idx, float a, float b)
 	torus.rc2 = a * a, torus.rt2 = b * b;
 	torus.T = Identity();
 	torus.invT = Identity();
-	torus.r2 = sqrt( a + b );
+	torus.r2 = (a + b) * (a + b);
 	return torus;
 }
 void IntersectTorus( struct Torus *torus, struct Ray *ray )
@@ -778,7 +770,7 @@ float3 DirectIllumination( float3 I, float3 N )
 	float ndotl = dot( N, L );
 	if (ndotl < EPSILON) /* we don't face the light */ return 0;
 	// cast a shadow ray
-	struct Ray s = GetRay( I + L * EPSILON, L, distance - 2 * EPSILON , -1);
+	struct Ray s = GetRay( I + L * EPSILON, L, distance - 2 * EPSILON , -1, INFTY, -1);
 	if (!IsOccluded( &s ))
 	{
 		// light is visible; calculate irradiance (= projected radiance)
@@ -799,8 +791,6 @@ __kernel void Trace(float t, __global uint* accumulator,  __global float* camera
 	int idx = get_global_id( 0 );
 	int x = idx % SCRWIDTH, y = idx / SCRWIDTH;
 
-	struct Ray ray = GetPrimaryRay(x, y);
-
 	struct mat4 identity = Identity();
 
 	float3 pos, norm;
@@ -815,7 +805,6 @@ __kernel void Trace(float t, __global uint* accumulator,  __global float* camera
 	pos.x = 0, pos.y = 2.5f, pos.z = -3.07f; sphere2 = GetSphere( 2, pos, 8 );	// 2: rounded corners
 	cube = GetCube( 3, 0, 1.15f, identity );									// 3: cube
 	norm.x = 1, norm.y = 0,norm.z = 0; plane[0] = GetPlane( 4, norm, 3 );			// 4: left wall
-	//printf("%f, %f, %f\n", plane[0].N.x, plane[0].N.y, plane[0].N.z);
 	norm.x = -1, norm.y = 0, norm.z = 0; plane[1] = GetPlane( 5, norm, 2.99f );		// 5: right wall
 	norm.x = 0, norm.y = 1, norm.z = 0; plane[2] = GetPlane( 6, norm, 1 );			// 6: floor
 	norm.x = 0, norm.y = -1, norm.z = 0; plane[3] = GetPlane( 7, norm, 2 );			// 7: ceiling
@@ -823,95 +812,107 @@ __kernel void Trace(float t, __global uint* accumulator,  __global float* camera
 	norm.x = 0, norm.y = 0, norm.z = -1; plane[5] = GetPlane( 9, norm, 3.99f );		// 9: back wall
 	torus = GetTorus( 10, 0.8f, 0.25f );										// 10: torus
 	torus.T = mat4Mul( Translate( -0.25f, 0, 2), RotateX( PI / 4 ) );
+	struct mat4 trans = Translate( -0.25f, 0, 2), rot = RotateX( PI / 4 );
+	//printf("%f, %f, %f, %f\n", rot.cell[4], rot.cell[5], rot.cell[6], rot.cell[7]);
+	//printf( "%f, %f, %f\n", torus.T.cell[0], torus.T.cell[5], torus.T.cell[10]);
 	torus.invT = Inverted( torus.T );
 
+#ifdef FOURLIGHTS
+	// four light sources are stationary
+	quad[0].T = Translate( -1, 1.5f, -1 ), quad[0].invT = FastInvertedTransformNoScale( quad[0].T );
+	quad[1].T = Translate( 1, 1.5f, -1 ), quad[1].invT = FastInvertedTransformNoScale( quad[1].T );
+	quad[2].T = Translate( 1, 1.5f, 1 ), quad[2].invT = FastInvertedTransformNoScale( quad[2].T );
+	quad[3].T = Translate( -1, 1.5f, 1 ), quad[3].invT = FastInvertedTransformNoScale( quad[3].T );
+#else
+	// light source animation: swing
+	struct mat4 M1base = Translate( float3( 0, 2.6f, 2 ) );
+	struct mat4 M1 = mat4Mul( mat4Mul( M1base,  RotateZ( sinf( t * 0.6f ) ) * 0.1f, Translate( float3( 0, -0.9f, 0 ) ) );
+	quad.T = M1, quad.invT = FastInvertedTransformNoScale( M1 );
+#endif
+	// cube animation: spin
+	struct mat4 M2base = mat4Mul(RotateX( PI / 4 ), RotateZ( PI / 4 ) );
+	struct mat4 M2 = mat4Mul( mat4Mul( Translate( 1.8f, 0, 2.5f ), RotateY( t * 0.5f ) ), M2base);
+	cube.M = M2, cube.invM = FastInvertedTransformNoScale( M2 );
+	// sphere animation: bounce
+	float temp = fmod(t, 2.0f) - 1;
+	float tm = 1 - temp * temp;
+	sphere.pos.x = -1.8f;
+	sphere.pos.y = -0.4f + tm;
+	sphere.pos.z = 1;
+
+	struct Ray primaryRay = GetPrimaryRay(x, y, 1, 0);
 	
+	float3 out_radiance = 0;
 
-	float3 accumulated_radiance = 0;
-    float3 medium_scale = 1;
+	struct Ray rays[128], ray;
+	int cur = 0, top = 1;
+	rays[0] = primaryRay;
 
-    for (int i = 0; i < MAXDEPTH; ++i)
-    {
-        // Intersect the ray with the scene
-        FindNearest( &ray );
-        if (ray.objIdx == -1) /* ray left the scene */
-            break;
+	while (cur != top) {
+		ray = rays[cur++];
 
-        if (i > MAXDEPTH) /* bounded too many times */
-            break;
+		// intersect the ray with the scene
+		FindNearest( &ray );
+		if (ray.objIdx == -1) /* ray left the scene */ continue;
+		if (ray.depth > MAXDEPTH) /* bouned too many times */ continue;
+		// gather shading data
+		float3 I = ray.O + ray.t * ray.D;
+		float3 N = GetNormal(ray.objIdx, I, ray.D);
+		float3 albedo = GetAlbedo(ray.objIdx, I, logo, red, blue);
+		// do whitted
+		
+		float reflectivity = GetReflectivity(ray.objIdx, I);
+		float refractivity = GetRefractivity(ray.objIdx, I);
+		float diffuseness = 1 - (reflectivity + refractivity);
+		// handle pure speculars such as mirrors
+		if (reflectivity > 0)
+		{
+			float3 R = reflect(ray.D, N);
+			struct Ray r = GetRay(I + R * EPSILON, R, reflectivity * albedo * ray.rate, ray.depth + 1, INFTY, -1);
+			rays[top++] = r;
+		}
+		// handle dielectrics such as glass / water
+		if (refractivity > 0)
+		{
+			// apply absorption if we travelled through a medium
+			float3 medium_scale = 1;
+			if (ray.inside)
+			{
+				float3 absorption;
+				absorption.x = 0.5f, absorption.y = 0, absorption.z = 0.5f; // GetAbsorption( objIdx );
+				medium_scale.x = exp(absorption.x * -ray.t);
+				medium_scale.y = exp(absorption.y * -ray.t);
+				medium_scale.z = exp(absorption.z * -ray.t);
+			}
+			float3 R = reflect(ray.D, N);
+			float n1 = ray.inside ? 1.2f : 1, n2 = ray.inside ? 1 : 1.2f;
+			float eta = n1 / n2, cosi = dot(-ray.D, N);
+			float cost2 = 1.0f - eta * eta * (1 - cosi * cosi);
+			float Fr = 1;
+			if (cost2 > 0)
+			{
+				float a = n1 - n2, b = n1 + n2, R0 = (a * a) / (b * b), c = 1 - cosi;
+				Fr = R0 + (1 - R0) * (c * c * c * c * c);
+				float3 T = eta * ray.D + ((eta * cosi - sqrt(fabs(cost2))) * N);
+				struct Ray t = GetRay(I + T * EPSILON, T, medium_scale * albedo * (1 - Fr) * ray.rate, ray.depth + 1, INFTY, -1);
+				t.inside = !ray.inside;
+				rays[top++] = t;
+			}
+			struct Ray r = GetRay(I + R * EPSILON, R, albedo * Fr * ray.rate, ray.depth + 1, INFTY, -1);
+			rays[top++] = r;
+		}
+		// handle diffuse surfaces
+		if (diffuseness > 0)
+		{
+			// calculate illumination
+			float3 irradiance = DirectIllumination(I, N);
+			// we don't account for diffuse interreflections: approximate
+			float3 ambient = 0.2f;
+			// calculate reflected radiance using Lambert brdf
+			float3 brdf = albedo * INVPI;
+			out_radiance += diffuseness * brdf * (irradiance + ambient) * ray.rate;
+		}
+	}
 
-        // Gather shading data
-        float3 I = ray.O + ray.t * ray.D;
-        float3 N = GetNormal(ray.objIdx, I, ray.D);
-        float3 albedo = GetAlbedo(ray.objIdx, I, logo, red, blue);
-        float reflectivity = GetReflectivity(ray.objIdx, I);
-        float refractivity = GetRefractivity(ray.objIdx, I);
-        float diffuseness = 1 - (reflectivity + refractivity);
-
-        // Do whitted
-        float3 out_radiance = 0;
-
-        // Handle pure speculars such as mirrors
-        if (reflectivity > 0)
-        {
-            float3 R = reflect(ray.D, N);
-            struct Ray r = GetRay(I + R * EPSILON, R, INFTY, -1);
-            ray = r;
-            accumulated_radiance += reflectivity * albedo * out_radiance;
-            continue;
-        }
-
-        // Handle dielectrics such as glass / water
-        if (refractivity > 0)
-        {
-            float3 R = reflect(ray.D, N);
-            struct Ray r = GetRay(I + R * EPSILON, R, INFTY, -1);
-            float n1 = ray.inside ? 1.2f : 1, n2 = ray.inside ? 1 : 1.2f;
-            float eta = n1 / n2, cosi = dot(-ray.D, N);
-            float cost2 = 1.0f - eta * eta * (1 - cosi * cosi);
-            float Fr = 1;
-            if (cost2 > 0)
-            {
-                float a = n1 - n2, b = n1 + n2, R0 = (a * a) / (b * b), c = 1 - cosi;
-                Fr = R0 + (1 - R0) * (c * c * c * c * c);
-                float3 T = eta * ray.D + ((eta * cosi - sqrt(fabs(cost2))) * N);
-                struct Ray t = GetRay(I + T * EPSILON, T, INFTY, -1);
-                t.inside = !ray.inside;
-                ray = t;
-                accumulated_radiance += albedo * (1 - Fr) * out_radiance;
-                continue;
-            }
-            accumulated_radiance += albedo * Fr * out_radiance;
-        }
-
-        // Handle diffuse surfaces
-        if (diffuseness > 0)
-        {
-            // Calculate illumination
-            float3 irradiance = DirectIllumination(I, N);
-            // We don't account for diffuse interreflections: approximate
-            float3 ambient = 0.2f;
-            // Calculate reflected radiance using Lambert brdf
-            float3 brdf = albedo * INVPI;
-            accumulated_radiance += diffuseness * brdf * (irradiance + ambient);
-        }
-
-        // Apply absorption if we traveled through a medium
-        if (ray.inside)
-        {
-            float3 absorption;
-			absorption.x = 0.5f, absorption.y = 0, absorption.z = 0.5f; // scene.GetAbsorption( objIdx );
-            medium_scale.x = exp(absorption.x * - ray.t);
-            medium_scale.y = exp(absorption.y * - ray.t);
-            medium_scale.z = exp(absorption.z * - ray.t);
-        }
-
-        break;
-    }
-
-	uint color = RGBF32_to_RGB8(medium_scale * accumulated_radiance);
-	//if(ray.objIdx != -1)printf("After: %d, %d, %d, %d\n", x, y, ray.objIdx, color);
-
-    accumulator[idx] = RGBF32_to_RGB8(medium_scale * accumulated_radiance);
-	
+	accumulator[idx] = RGBF32_to_RGB8( out_radiance );
 }

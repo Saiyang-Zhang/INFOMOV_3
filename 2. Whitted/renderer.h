@@ -29,7 +29,6 @@ public:
 	void KeyDown( int key ) { /* implement if you want to handle keys */ }
 	// data members
 	int2 mousePos;
-	float4* accumulator;
 	Scene scene;
 	Camera camera;
 	bool animating = true;
@@ -41,9 +40,8 @@ public:
 	Ray GetPrimaryRay(float x, float y, float3 rate, int depth, float* camera_params);
 
 	float camera_params[12];
-	uint accum[SCRWIDTH * SCRHEIGHT];
+	uint accumulator[SCRWIDTH * SCRHEIGHT];
 
-	Kernel* kernel_test = nullptr;
 	Kernel* kernel_trace = nullptr;
 
 	Buffer* buffer_accumulator = nullptr;

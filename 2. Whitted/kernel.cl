@@ -16,17 +16,6 @@
 
 float3 camPos, topLeft, topRight, bottomLeft;
 
-struct test
-{
-	float x, y;
-};
-
-__kernel void test(__global float* a)
-{
-	int idx = get_global_id( 0 );
-	int idy = get_global_id( 1 );
-}
-
 struct mat4
 {
 	float cell[16];
@@ -168,12 +157,6 @@ inline uint RGBF32_to_RGB8( float3 v )
 	return (r << 16) + (g << 8) + b;
 }
 inline float3 reflect( float3 i, float3 n ) { return i - 2.0f * n * dot( n, i ); }
-float fmodf(float x, float y) {
-    float quotient = x / y;
-    int intQuotient = (int)quotient;
-
-    return x - (intQuotient * y);
-}
 
 struct Ray
 {
@@ -507,7 +490,7 @@ struct Torus GetTorus( int idx, float a, float b)
 	torus.rc2 = a * a, torus.rt2 = b * b;
 	torus.T = Identity();
 	torus.invT = Identity();
-	torus.r2 = sqrt( a + b );
+	torus.r2 = (a + b) * (a + b);
 	return torus;
 }
 void IntersectTorus( struct Torus *torus, struct Ray *ray )
@@ -851,11 +834,11 @@ __kernel void Trace(float t, __global uint* accumulator,  __global float* camera
 	struct mat4 M2 = mat4Mul( mat4Mul( Translate( 1.8f, 0, 2.5f ), RotateY( t * 0.5f ) ), M2base);
 	cube.M = M2, cube.invM = FastInvertedTransformNoScale( M2 );
 	// sphere animation: bounce
-	float temp = fmodf( t, 2.0f ) - 1;
-	float tm = 1 - sqrt( temp );
+	float temp = fmod(t, 2.0f) - 1;
+	float tm = 1 - temp * temp;
 	sphere.pos.x = -1.8f;
 	sphere.pos.y = -0.4f + tm;
-	sphere.pos.z = 1 ;
+	sphere.pos.z = 1;
 
 	struct Ray primaryRay = GetPrimaryRay(x, y, 1, 0);
 	

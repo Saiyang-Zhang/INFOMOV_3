@@ -1,9 +1,5 @@
 #include "precomp.h"
 
-struct test {
-	float x, y;
-};
-
 Ray Renderer::GetRay(const float3 origin, const float3 direction, float3 rate, int depth, const float distance = 1e34f, const int idx = -1)
 {
 	Ray ray;
@@ -38,9 +34,6 @@ Ray Renderer::GetPrimaryRay(float x, float y, float3 rate, int depth, float* cam
 // -----------------------------------------------------------
 void Renderer::Init()
 {
-	// create fp32 rgb pixel buffer to render to
-	accumulator = (float4*)MALLOC64( SCRWIDTH * SCRHEIGHT * 16 );
-	memset( accumulator, 0, SCRWIDTH * SCRHEIGHT * 16 );
 	// retrieve cam
 	FILE* f = fopen( "appstate.dat", "rb" );
 	if (f)
@@ -49,30 +42,7 @@ void Renderer::Init()
 		fclose( f );
 	}
 
-	kernel_test = new Kernel("kernel.cl", "test");
 	kernel_trace = new Kernel("kernel.cl", "Trace");
-
-	//float a[32][32];
-	//int2 global_size = int2(32);
-	//int2 local_size = int2(8);
-
-	//for (int i = 0; i < 32; i++)
-	//	for (int j = 0; j < 32; j++)
-	//		a[i][j] = 1;
-
-	//Buffer* buffer_a = new Buffer(sizeof(float) * 1024, a, CL_MEM_READ_WRITE);
-
-	//test flag;
-	//flag.x = 2;
-	//flag.y = 2;
-
-	//buffer_a->CopyToDevice();
-	//kernel_test->SetArguments(buffer_a);
-	//kernel_test->Run2D(global_size, local_size);
-	//buffer_a->CopyFromDevice();
-
-	//for (int i = 1014; i < 1024; i++)
-	//	printf("%f\n", a[0][i]);
 
 	static Surface logo("../assets/logo.png");
 	static Surface red("../assets/red.png");
@@ -206,7 +176,7 @@ void Renderer::Tick( float deltaTime )
 	camera_params[9] = camera.bottomLeft.x, camera_params[10] = camera.bottomLeft.y, camera_params[11] = camera.bottomLeft.z;
 
 	buffer_camera = new Buffer(sizeof( camera_params ), camera_params, CL_MEM_READ_ONLY);
-	buffer_accumulator = new Buffer(sizeof(accum), accum, CL_MEM_READ_WRITE);
+	buffer_accumulator = new Buffer(sizeof(accumulator), accumulator, CL_MEM_READ_WRITE);
 
 	buffer_camera->CopyToDevice();
 	buffer_accumulator->CopyToDevice();
@@ -222,20 +192,8 @@ void Renderer::Tick( float deltaTime )
 
 #pragma omp parallel for schedule(dynamic)
 	for (int y = 0; y < SCRHEIGHT; y++)
-	{
-		//// trace a primary ray for each pixel on the line
-		//for (int x = 0; x < SCRWIDTH; x++)
-		//	accumulator[x + y * SCRWIDTH] =
-		//	float4( Trace( GetPrimaryRay( (float)x, (float)y , 1, 0, camera_params ) ), 0 );
-		// translate accumulator contents to rgb32 pixels
 		for (int dest = y * SCRWIDTH, x = 0; x < SCRWIDTH; x++)
-		{
-			screen->pixels[dest + x] = accum[dest + x];
-			//RGBF32_to_RGB8( &accumulator[x + y * SCRWIDTH] );
-			//printf("%d %d %d\n", x, y, screen->pixels[dest + x]);
-		}
-			
-	}
+			screen->pixels[dest + x] = accumulator[dest + x];
 	// performance report - running average - ms, MRays/s
 	avg = (1 - alpha) * avg + alpha * t.elapsed() * 1000;
 	if (alpha > 0.05f) alpha *= 0.75f;
