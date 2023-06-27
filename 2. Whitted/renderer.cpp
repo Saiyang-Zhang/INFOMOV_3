@@ -4,7 +4,7 @@ struct test {
 	float x, y;
 };
 
-Ray Renderer::GetRay(const float3 origin, const float3 direction, const float distance = 1e34f, const int idx = -1)
+Ray Renderer::GetRay(const float3 origin, const float3 direction, float3 rate, int depth, const float distance = 1e34f, const int idx = -1)
 {
 	Ray ray;
 	ray.O = origin;
@@ -13,10 +13,11 @@ Ray Renderer::GetRay(const float3 origin, const float3 direction, const float di
 	ray.objIdx = idx;
 	ray.inside = false;
 	ray.rD.x = 1 / ray.D.x, ray.rD.y = 1 / ray.D.y, ray.rD.z = 1 / ray.D.z;
+	ray.rate = rate, ray.depth = depth;
 	return ray;
 }
 
-Ray Renderer::GetPrimaryRay(float x, float y, float* camera_params)
+Ray Renderer::GetPrimaryRay(float x, float y, float3 rate, int depth, float* camera_params)
 {
 	float3 camPos, topLeft, topRight, bottomLeft;
 	camPos.x = camera_params[0], camPos.y = camera_params[1], camPos.z = camera_params[2];
@@ -29,14 +30,7 @@ Ray Renderer::GetPrimaryRay(float x, float y, float* camera_params)
 	const float v = (float)y * (1.0f / SCRHEIGHT);
 	const float3 P = topLeft + u * (topRight - topLeft) + v * (bottomLeft - topLeft);
 
-	struct Ray ray;
-	ray.O = camPos;
-	ray.D = normalize(P - camPos);
-	ray.t = 1e34f;
-	ray.objIdx = -1;
-	ray.inside = false;
-	ray.rD.x = 1 / ray.D.x, ray.rD.y = 1 / ray.D.y, ray.rD.z = 1 / ray.D.z;
-	return ray;
+	return GetRay(camPos, normalize(P - camPos), rate, depth, 1e34f, -1);
 }
 
 // -----------------------------------------------------------
@@ -107,7 +101,7 @@ float3 Renderer::DirectIllumination( const float3& I, const float3& N )
 	float ndotl = dot( N, L );
 	if (ndotl < EPSILON) /* we don't face the light */ return 0;
 	// cast a shadow ray
-	struct Ray s = GetRay( I + L * EPSILON, L, distance - 2 * EPSILON );
+	struct Ray s = GetRay( I + L * EPSILON, L, distance - 2 * EPSILON, 1, 0);
 	if (!scene.IsOccluded( s ))
 	{
 		// light is visible; calculate irradiance (= projected radiance)
@@ -121,93 +115,82 @@ float3 Renderer::DirectIllumination( const float3& I, const float3& N )
 // -----------------------------------------------------------
 // Evaluate light transport
 // -----------------------------------------------------------
-float3 Renderer::Trace(Ray& ray, int depth)
+float3 Renderer::Trace(Ray& primaryRay)
 {
-    float3 accumulated_radiance(0);
-    float3 medium_scale(1);
+	float3 out_radiance = 0;
 
-    for (int i = 0; i < MAXDEPTH; ++i)
-    {
-        // Intersect the ray with the scene
-        scene.FindNearest(ray);
-        if (ray.objIdx == -1) /* ray left the scene */
-            break;
+	struct Ray rays[128], ray;
+	int cur = 0, top = 1;
+	rays[0] = primaryRay;
 
-        if (depth > MAXDEPTH) /* bounded too many times */
-            break;
+	while (top != 0) {
+		ray = rays[0];
+		for (int i = 0; i < top; i++) rays[i] = rays[top--];
 
-        // Gather shading data
-        float3 I = ray.O + ray.t * ray.D;
-        float3 N = scene.GetNormal(ray.objIdx, I, ray.D);
-        float3 albedo = scene.GetAlbedo(ray.objIdx, I);
-        float reflectivity = scene.GetReflectivity(ray.objIdx, I);
-        float refractivity = scene.GetRefractivity(ray.objIdx, I);
-        float diffuseness = 1 - (reflectivity + refractivity);
+		// intersect the ray with the scene
+		scene.FindNearest(ray);
+		if (ray.objIdx == -1) /* ray left the scene */ continue;
+		if (ray.depth > MAXDEPTH) /* bouned too many times */ continue;
+		// gather shading data
+		float3 I = ray.O + ray.t * ray.D;
+		float3 N = scene.GetNormal(ray.objIdx, I, ray.D);
+		float3 albedo = scene.GetAlbedo(ray.objIdx, I);
+		// do whitted
+		
+		float reflectivity = scene.GetReflectivity(ray.objIdx, I);
+		float refractivity = scene.GetRefractivity(ray.objIdx, I);
+		float diffuseness = 1 - (reflectivity + refractivity);
+		// handle pure speculars such as mirrors
+		if (reflectivity > 0)
+		{
+			float3 R = reflect(ray.D, N);
+			struct Ray r = GetRay(I + R * EPSILON, R, reflectivity * albedo * ray.rate, ray.depth + 1);
+			rays[top++] = r;
+		}
+		// handle dielectrics such as glass / water
+		if (refractivity > 0)
+		{
+			float3 medium_scale(1);
+			if (ray.inside)
+			{
+				float3 absorption = float3(0.5f, 0, 0.5f); // scene.GetAbsorption( objIdx );
+				medium_scale.x = expf(absorption.x * -ray.t);
+				medium_scale.y = expf(absorption.y * -ray.t);
+				medium_scale.z = expf(absorption.z * -ray.t);
+			}
+			float3 R = reflect(ray.D, N);
+			float n1 = ray.inside ? 1.2f : 1, n2 = ray.inside ? 1 : 1.2f;
+			float eta = n1 / n2, cosi = dot(-ray.D, N);
+			float cost2 = 1.0f - eta * eta * (1 - cosi * cosi);
+			float Fr = 1;
+			if (cost2 > 0)
+			{
+				float a = n1 - n2, b = n1 + n2, R0 = (a * a) / (b * b), c = 1 - cosi;
+				Fr = R0 + (1 - R0) * (c * c * c * c * c);
+				float3 T = eta * ray.D + ((eta * cosi - sqrtf(fabs(cost2))) * N);
+				struct Ray t = GetRay(I + T * EPSILON, T, medium_scale * albedo * (1 - Fr) * ray.rate, ray.depth + 1);
+				t.inside = !ray.inside;
+				rays[top++] = t;
+			}
+			struct Ray r = GetRay(I + R * EPSILON, R, albedo * Fr * ray.rate, ray.depth+1);
+			rays[top++] = r;
+		}
+		// handle diffuse surfaces
+		if (diffuseness > 0)
+		{
+			// calculate illumination
+			float3 irradiance = DirectIllumination(I, N);
+			// we don't account for diffuse interreflections: approximate
+			float3 ambient = float3(0.2f, 0.2f, 0.2f);
+			// calculate reflected radiance using Lambert brdf
+			float3 brdf = albedo * INVPI;
+			out_radiance += diffuseness * brdf * (irradiance + ambient) * ray.rate;
+		}
+		// apply absorption if we travelled through a medium
+	}
 
-        // Do whitted
-        float3 out_radiance(0);
-
-        // Handle pure speculars such as mirrors
-        if (reflectivity > 0)
-        {
-            float3 R = reflect(ray.D, N);
-            struct Ray r = GetRay(I + R * EPSILON, R);
-            ray = r;
-            accumulated_radiance += reflectivity * albedo * out_radiance;
-            continue;
-        }
-
-        // Handle dielectrics such as glass / water
-        if (refractivity > 0)
-        {
-            float3 R = reflect(ray.D, N);
-            struct Ray r = GetRay(I + R * EPSILON, R);
-            float n1 = ray.inside ? 1.2f : 1, n2 = ray.inside ? 1 : 1.2f;
-            float eta = n1 / n2, cosi = dot(-ray.D, N);
-            float cost2 = 1.0f - eta * eta * (1 - cosi * cosi);
-            float Fr = 1;
-            if (cost2 > 0)
-            {
-                float a = n1 - n2, b = n1 + n2, R0 = (a * a) / (b * b), c = 1 - cosi;
-                Fr = R0 + (1 - R0) * (c * c * c * c * c);
-                float3 T = eta * ray.D + ((eta * cosi - sqrtf(fabs(cost2))) * N);
-                struct Ray t = GetRay(I + T * EPSILON, T);
-                t.inside = !ray.inside;
-                ray = t;
-                accumulated_radiance += albedo * (1 - Fr) * out_radiance;
-                continue;
-            }
-            accumulated_radiance += albedo * Fr * out_radiance;
-        }
-
-        // Handle diffuse surfaces
-        if (diffuseness > 0)
-        {
-            // Calculate illumination
-            float3 irradiance = DirectIllumination(I, N);
-            // We don't account for diffuse interreflections: approximate
-            float3 ambient = float3(0.2f, 0.2f, 0.2f);
-            // Calculate reflected radiance using Lambert brdf
-            float3 brdf = albedo * INVPI;
-            accumulated_radiance += diffuseness * brdf * (irradiance + ambient);
-        }
-
-        // Apply absorption if we traveled through a medium
-        if (ray.inside)
-        {
-            float3 absorption = float3(0.5f, 0, 0.5f); // scene.GetAbsorption( objIdx );
-            medium_scale.x = expf(absorption.x * - ray.t);
-            medium_scale.y = expf(absorption.y * - ray.t);
-            medium_scale.z = expf(absorption.z * - ray.t);
-        }
-
-        break;
-    }
-
-    return medium_scale * accumulated_radiance;
+	return out_radiance;
 }
-
-
 
 
 // -----------------------------------------------------------
@@ -241,15 +224,15 @@ void Renderer::Tick( float deltaTime )
 #pragma omp parallel for schedule(dynamic)
 	for (int y = 0; y < SCRHEIGHT; y++)
 	{
-		//// trace a primary ray for each pixel on the line
-		//for (int x = 0; x < SCRWIDTH; x++)
-		//	accumulator[x + y * SCRWIDTH] =
-		//	float4( Trace( GetPrimaryRay( (float)x, (float)y , camera_params ) ), 0 );
-		//// translate accumulator contents to rgb32 pixels
+		// trace a primary ray for each pixel on the line
+		for (int x = 0; x < SCRWIDTH; x++)
+			accumulator[x + y * SCRWIDTH] =
+			float4( Trace( GetPrimaryRay( (float)x, (float)y , 1, 0, camera_params ) ), 0 );
+		// translate accumulator contents to rgb32 pixels
 		for (int dest = y * SCRWIDTH, x = 0; x < SCRWIDTH; x++)
 		{
-			screen->pixels[dest + x] = accum[dest + x];
-			//RGBF32_to_RGB8( &accumulator[x + y * SCRWIDTH] );
+			screen->pixels[dest + x] = //accum[dest + x];
+			RGBF32_to_RGB8( &accumulator[x + y * SCRWIDTH] );
 			//printf("%d %d %d\n", x, y, screen->pixels[dest + x]);
 		}
 			
@@ -269,7 +252,7 @@ void Renderer::UI()
 	// animation toggle
 	ImGui::Checkbox( "Animate scene", &animating );
 	// ray query on mouse
-	Ray r = GetPrimaryRay( (float)mousePos.x, (float)mousePos.y, camera_params );
+	Ray r = GetPrimaryRay( (float)mousePos.x, (float)mousePos.y, 1, 0, camera_params );
 	scene.FindNearest( r );
 	ImGui::Text( "Object id %i", r.objIdx );
 	ImGui::Text( "Frame: %5.2fms (%.1ffps)", avg, 1000 / avg );

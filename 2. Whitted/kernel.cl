@@ -176,8 +176,10 @@ struct Ray
 	float t;
 	int objIdx;
 	bool inside; // true when in medium
+	float3 rate;
+	int depth;
 };
-struct Ray GetRay(float3 origin, float3 direction, float distance, int idx)
+struct Ray GetRay(float3 origin, float3 direction, float3 rate, int depth, float distance, int idx)
 {
 	struct Ray ray;
 	ray.O = origin;
@@ -186,16 +188,17 @@ struct Ray GetRay(float3 origin, float3 direction, float distance, int idx)
 	ray.objIdx = idx;
 	ray.inside = false;
 	ray.rD.x = 1 / ray.D.x, ray.rD.y = 1 / ray.D.y, ray.rD.z = 1 / ray.D.z;
+	ray.rate = rate, ray.depth = depth;
 	return ray;
 }
-struct Ray GetPrimaryRay(float x, float y) 
+struct Ray GetPrimaryRay(float x, float y, float3 rate, int depth) 
 {
 	// calculate pixel position on virtual screen plane
 	const float u = (float)x * (1.0f / SCRWIDTH);
 	const float v = (float)y * (1.0f / SCRHEIGHT);
 	const float3 P = topLeft + u * (topRight - topLeft) + v * (bottomLeft - topLeft);
 
-	return GetRay(camPos, normalize( P - camPos ), INFTY, -1);
+	return GetRay(camPos, normalize( P - camPos ), rate, depth, INFTY, -1);
 }
 
 
@@ -778,7 +781,7 @@ float3 DirectIllumination( float3 I, float3 N )
 	float ndotl = dot( N, L );
 	if (ndotl < EPSILON) /* we don't face the light */ return 0;
 	// cast a shadow ray
-	struct Ray s = GetRay( I + L * EPSILON, L, distance - 2 * EPSILON , -1);
+	struct Ray s = GetRay( I + L * EPSILON, L, distance - 2 * EPSILON , -1, INFTY, -1);
 	if (!IsOccluded( &s ))
 	{
 		// light is visible; calculate irradiance (= projected radiance)
@@ -798,8 +801,6 @@ __kernel void Trace(float t, __global uint* accumulator,  __global float* camera
 	 
 	int idx = get_global_id( 0 );
 	int x = idx % SCRWIDTH, y = idx / SCRWIDTH;
-
-	struct Ray ray = GetPrimaryRay(x, y);
 
 	struct mat4 identity = Identity();
 
@@ -824,93 +825,79 @@ __kernel void Trace(float t, __global uint* accumulator,  __global float* camera
 	torus.T = mat4Mul( Translate( -0.25f, 0, 2), RotateX( PI / 4 ) );
 	torus.invT = Inverted( torus.T );
 
+	struct Ray primaryRay = GetPrimaryRay(x, y, 1, 0);
 	
+	float3 out_radiance = 0;
 
-	float3 accumulated_radiance = 0;
-    float3 medium_scale = 1;
+	struct Ray rays[128], ray;
+	int cur = 0, top = 1;
+	rays[0] = primaryRay;
 
-    for (int i = 0; i < MAXDEPTH; ++i)
-    {
-        // Intersect the ray with the scene
-        FindNearest( &ray );
-        if (ray.objIdx == -1) /* ray left the scene */
-            break;
+	while (cur != top) {
+		ray = rays[cur++];
 
-        if (i > MAXDEPTH) /* bounded too many times */
-            break;
+		// intersect the ray with the scene
+		FindNearest( &ray );
+		if (ray.objIdx == -1) /* ray left the scene */ continue;
+		if (ray.depth > MAXDEPTH) /* bouned too many times */ continue;
+		// gather shading data
+		float3 I = ray.O + ray.t * ray.D;
+		float3 N = GetNormal(ray.objIdx, I, ray.D);
+		float3 albedo = GetAlbedo(ray.objIdx, I, logo, red, blue);
+		// do whitted
+		
+		float reflectivity = GetReflectivity(ray.objIdx, I);
+		float refractivity = GetRefractivity(ray.objIdx, I);
+		float diffuseness = 1 - (reflectivity + refractivity);
+		// handle pure speculars such as mirrors
+		if (reflectivity > 0)
+		{
+			float3 R = reflect(ray.D, N);
+			struct Ray r = GetRay(I + R * EPSILON, R, reflectivity * albedo * ray.rate, ray.depth + 1, INFTY, -1);
+			rays[top++] = r;
+		}
+		// handle dielectrics such as glass / water
+		if (refractivity > 0)
+		{
+			// apply absorption if we travelled through a medium
+			float3 medium_scale = 1;
+			if (ray.inside)
+			{
+				float3 absorption;
+				absorption.x = 0.5f, absorption.y = 0, absorption.z = 0.5f; // GetAbsorption( objIdx );
+				medium_scale.x = exp(absorption.x * -ray.t);
+				medium_scale.y = exp(absorption.y * -ray.t);
+				medium_scale.z = exp(absorption.z * -ray.t);
+			}
+			float3 R = reflect(ray.D, N);
+			float n1 = ray.inside ? 1.2f : 1, n2 = ray.inside ? 1 : 1.2f;
+			float eta = n1 / n2, cosi = dot(-ray.D, N);
+			float cost2 = 1.0f - eta * eta * (1 - cosi * cosi);
+			float Fr = 1;
+			if (cost2 > 0)
+			{
+				float a = n1 - n2, b = n1 + n2, R0 = (a * a) / (b * b), c = 1 - cosi;
+				Fr = R0 + (1 - R0) * (c * c * c * c * c);
+				float3 T = eta * ray.D + ((eta * cosi - sqrt(fabs(cost2))) * N);
+				struct Ray t = GetRay(I + T * EPSILON, T, medium_scale * albedo * (1 - Fr) * ray.rate, ray.depth + 1, INFTY, -1);
+				t.inside = !ray.inside;
+				rays[top++] = t;
+			}
+			struct Ray r = GetRay(I + R * EPSILON, R, albedo * Fr * ray.rate, ray.depth + 1, INFTY, -1);
+			rays[top++] = r;
+		}
+		// handle diffuse surfaces
+		if (diffuseness > 0)
+		{
+			// calculate illumination
+			float3 irradiance = DirectIllumination(I, N);
+			// we don't account for diffuse interreflections: approximate
+			float3 ambient = 0.2f;
+			// calculate reflected radiance using Lambert brdf
+			float3 brdf = albedo * INVPI;
+			out_radiance += diffuseness * brdf * (irradiance + ambient) * ray.rate;
+		}
+	}
 
-        // Gather shading data
-        float3 I = ray.O + ray.t * ray.D;
-        float3 N = GetNormal(ray.objIdx, I, ray.D);
-        float3 albedo = GetAlbedo(ray.objIdx, I, logo, red, blue);
-        float reflectivity = GetReflectivity(ray.objIdx, I);
-        float refractivity = GetRefractivity(ray.objIdx, I);
-        float diffuseness = 1 - (reflectivity + refractivity);
-
-        // Do whitted
-        float3 out_radiance = 0;
-
-        // Handle pure speculars such as mirrors
-        if (reflectivity > 0)
-        {
-            float3 R = reflect(ray.D, N);
-            struct Ray r = GetRay(I + R * EPSILON, R, INFTY, -1);
-            ray = r;
-            accumulated_radiance += reflectivity * albedo * out_radiance;
-            continue;
-        }
-
-        // Handle dielectrics such as glass / water
-        if (refractivity > 0)
-        {
-            float3 R = reflect(ray.D, N);
-            struct Ray r = GetRay(I + R * EPSILON, R, INFTY, -1);
-            float n1 = ray.inside ? 1.2f : 1, n2 = ray.inside ? 1 : 1.2f;
-            float eta = n1 / n2, cosi = dot(-ray.D, N);
-            float cost2 = 1.0f - eta * eta * (1 - cosi * cosi);
-            float Fr = 1;
-            if (cost2 > 0)
-            {
-                float a = n1 - n2, b = n1 + n2, R0 = (a * a) / (b * b), c = 1 - cosi;
-                Fr = R0 + (1 - R0) * (c * c * c * c * c);
-                float3 T = eta * ray.D + ((eta * cosi - sqrt(fabs(cost2))) * N);
-                struct Ray t = GetRay(I + T * EPSILON, T, INFTY, -1);
-                t.inside = !ray.inside;
-                ray = t;
-                accumulated_radiance += albedo * (1 - Fr) * out_radiance;
-                continue;
-            }
-            accumulated_radiance += albedo * Fr * out_radiance;
-        }
-
-        // Handle diffuse surfaces
-        if (diffuseness > 0)
-        {
-            // Calculate illumination
-            float3 irradiance = DirectIllumination(I, N);
-            // We don't account for diffuse interreflections: approximate
-            float3 ambient = 0.2f;
-            // Calculate reflected radiance using Lambert brdf
-            float3 brdf = albedo * INVPI;
-            accumulated_radiance += diffuseness * brdf * (irradiance + ambient);
-        }
-
-        // Apply absorption if we traveled through a medium
-        if (ray.inside)
-        {
-            float3 absorption;
-			absorption.x = 0.5f, absorption.y = 0, absorption.z = 0.5f; // scene.GetAbsorption( objIdx );
-            medium_scale.x = exp(absorption.x * - ray.t);
-            medium_scale.y = exp(absorption.y * - ray.t);
-            medium_scale.z = exp(absorption.z * - ray.t);
-        }
-
-        break;
-    }
-
-	uint color = RGBF32_to_RGB8(medium_scale * accumulated_radiance);
-	//if(ray.objIdx != -1)printf("After: %d, %d, %d, %d\n", x, y, ray.objIdx, color);
-
-    accumulator[idx] = RGBF32_to_RGB8(medium_scale * accumulated_radiance);
-	
+	accumulator[idx] = RGBF32_to_RGB8( 10 * out_radiance );
 }

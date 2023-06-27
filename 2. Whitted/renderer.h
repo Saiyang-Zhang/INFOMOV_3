@@ -11,7 +11,7 @@ class Renderer : public TheApp
 public:
 	// game flow methods
 	void Init();
-	float3 Trace( Ray& ray, int depth = 0 );
+	float3 Trace( Ray& ray);
 	float3 DirectIllumination( const float3& I, const float3& N );
 	void Tick( float deltaTime );
 	void UI();
@@ -37,8 +37,8 @@ public:
 	// fps smoothing
 	float avg = 10, alpha = 1;
 
-	Ray GetRay(const float3 origin, const float3 direction, const float distance, const int idx);
-	Ray GetPrimaryRay(float x, float y, float* camera_params);
+	Ray GetRay(const float3 origin, const float3 direction, float3 rate, int depth, const float distance, const int idx);
+	Ray GetPrimaryRay(float x, float y, float3 rate, int depth, float* camera_params);
 
 	float camera_params[12];
 	uint accum[SCRWIDTH * SCRHEIGHT];
