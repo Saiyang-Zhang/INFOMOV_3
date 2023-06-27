@@ -96,6 +96,7 @@ struct mat4 mat4Mul( struct mat4 a, struct mat4 b )
 				(a.cell[i + 2] * b.cell[j + 8]) +
 				(a.cell[i + 3] * b.cell[j + 12]);
 		}
+	return r;
 }
 struct mat4 Inverted( struct mat4 a )
 {
@@ -167,7 +168,12 @@ inline uint RGBF32_to_RGB8( float3 v )
 	return (r << 16) + (g << 8) + b;
 }
 inline float3 reflect( float3 i, float3 n ) { return i - 2.0f * n * dot( n, i ); }
+float fmodf(float x, float y) {
+    float quotient = x / y;
+    int intQuotient = (int)quotient;
 
+    return x - (intQuotient * y);
+}
 
 struct Ray
 {
@@ -823,7 +829,33 @@ __kernel void Trace(float t, __global uint* accumulator,  __global float* camera
 	norm.x = 0, norm.y = 0, norm.z = -1; plane[5] = GetPlane( 9, norm, 3.99f );		// 9: back wall
 	torus = GetTorus( 10, 0.8f, 0.25f );										// 10: torus
 	torus.T = mat4Mul( Translate( -0.25f, 0, 2), RotateX( PI / 4 ) );
+	struct mat4 trans = Translate( -0.25f, 0, 2), rot = RotateX( PI / 4 );
+	//printf("%f, %f, %f, %f\n", rot.cell[4], rot.cell[5], rot.cell[6], rot.cell[7]);
+	//printf( "%f, %f, %f\n", torus.T.cell[0], torus.T.cell[5], torus.T.cell[10]);
 	torus.invT = Inverted( torus.T );
+
+#ifdef FOURLIGHTS
+	// four light sources are stationary
+	quad[0].T = Translate( -1, 1.5f, -1 ), quad[0].invT = FastInvertedTransformNoScale( quad[0].T );
+	quad[1].T = Translate( 1, 1.5f, -1 ), quad[1].invT = FastInvertedTransformNoScale( quad[1].T );
+	quad[2].T = Translate( 1, 1.5f, 1 ), quad[2].invT = FastInvertedTransformNoScale( quad[2].T );
+	quad[3].T = Translate( -1, 1.5f, 1 ), quad[3].invT = FastInvertedTransformNoScale( quad[3].T );
+#else
+	// light source animation: swing
+	struct mat4 M1base = Translate( float3( 0, 2.6f, 2 ) );
+	struct mat4 M1 = mat4Mul( mat4Mul( M1base,  RotateZ( sinf( t * 0.6f ) ) * 0.1f, Translate( float3( 0, -0.9f, 0 ) ) );
+	quad.T = M1, quad.invT = FastInvertedTransformNoScale( M1 );
+#endif
+	// cube animation: spin
+	struct mat4 M2base = mat4Mul(RotateX( PI / 4 ), RotateZ( PI / 4 ) );
+	struct mat4 M2 = mat4Mul( mat4Mul( Translate( 1.8f, 0, 2.5f ), RotateY( t * 0.5f ) ), M2base);
+	cube.M = M2, cube.invM = FastInvertedTransformNoScale( M2 );
+	// sphere animation: bounce
+	float temp = fmodf( t, 2.0f ) - 1;
+	float tm = 1 - sqrt( temp );
+	sphere.pos.x = -1.8f;
+	sphere.pos.y = -0.4f + tm;
+	sphere.pos.z = 1 ;
 
 	struct Ray primaryRay = GetPrimaryRay(x, y, 1, 0);
 	
@@ -899,5 +931,5 @@ __kernel void Trace(float t, __global uint* accumulator,  __global float* camera
 		}
 	}
 
-	accumulator[idx] = RGBF32_to_RGB8( 10 * out_radiance );
+	accumulator[idx] = RGBF32_to_RGB8( out_radiance );
 }

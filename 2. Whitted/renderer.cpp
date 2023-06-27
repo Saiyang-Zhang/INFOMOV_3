@@ -123,9 +123,8 @@ float3 Renderer::Trace(Ray& primaryRay)
 	int cur = 0, top = 1;
 	rays[0] = primaryRay;
 
-	while (top != 0) {
-		ray = rays[0];
-		for (int i = 0; i < top; i++) rays[i] = rays[top--];
+	while (cur != top) {
+		ray = rays[cur++];
 
 		// intersect the ray with the scene
 		scene.FindNearest(ray);
@@ -224,15 +223,15 @@ void Renderer::Tick( float deltaTime )
 #pragma omp parallel for schedule(dynamic)
 	for (int y = 0; y < SCRHEIGHT; y++)
 	{
-		// trace a primary ray for each pixel on the line
-		for (int x = 0; x < SCRWIDTH; x++)
-			accumulator[x + y * SCRWIDTH] =
-			float4( Trace( GetPrimaryRay( (float)x, (float)y , 1, 0, camera_params ) ), 0 );
+		//// trace a primary ray for each pixel on the line
+		//for (int x = 0; x < SCRWIDTH; x++)
+		//	accumulator[x + y * SCRWIDTH] =
+		//	float4( Trace( GetPrimaryRay( (float)x, (float)y , 1, 0, camera_params ) ), 0 );
 		// translate accumulator contents to rgb32 pixels
 		for (int dest = y * SCRWIDTH, x = 0; x < SCRWIDTH; x++)
 		{
-			screen->pixels[dest + x] = //accum[dest + x];
-			RGBF32_to_RGB8( &accumulator[x + y * SCRWIDTH] );
+			screen->pixels[dest + x] = accum[dest + x];
+			//RGBF32_to_RGB8( &accumulator[x + y * SCRWIDTH] );
 			//printf("%d %d %d\n", x, y, screen->pixels[dest + x]);
 		}
 			
