@@ -215,8 +215,8 @@ float3 Renderer::Trace(Ray& ray, int depth)
 // -----------------------------------------------------------
 void Renderer::Tick( float deltaTime )
 {
-	int2 global_size = int2(SCRWIDTH, SCRHEIGHT);
-	int2 local_size = int2(32, 16);
+	int global_size = SCRWIDTH * SCRHEIGHT;
+	int local_size = 128;
 
 	camera_params[0] = camera.camPos.x, camera_params[1] = camera.camPos.y, camera_params[2] = camera.camPos.z;
 	camera_params[3] = camera.topLeft.x, camera_params[4] = camera.topLeft.y, camera_params[5] = camera.topLeft.z;
@@ -229,7 +229,7 @@ void Renderer::Tick( float deltaTime )
 	buffer_camera->CopyToDevice();
 	buffer_accumulator->CopyToDevice();
 	kernel_trace->SetArguments(anim_time, buffer_accumulator, buffer_camera, buffer_logo, buffer_red, buffer_blue);
-	kernel_trace->Run2D(global_size, local_size);
+	kernel_trace->Run(global_size, local_size);
 	buffer_accumulator->CopyFromDevice();
 
 	// animation
@@ -241,14 +241,18 @@ void Renderer::Tick( float deltaTime )
 #pragma omp parallel for schedule(dynamic)
 	for (int y = 0; y < SCRHEIGHT; y++)
 	{
-		// trace a primary ray for each pixel on the line
-		for (int x = 0; x < SCRWIDTH; x++)
-			accumulator[x + y * SCRWIDTH] =
-			float4( Trace( GetPrimaryRay( (float)x, (float)y , camera_params ) ), 0 );
-		// translate accumulator contents to rgb32 pixels
+		//// trace a primary ray for each pixel on the line
+		//for (int x = 0; x < SCRWIDTH; x++)
+		//	accumulator[x + y * SCRWIDTH] =
+		//	float4( Trace( GetPrimaryRay( (float)x, (float)y , camera_params ) ), 0 );
+		//// translate accumulator contents to rgb32 pixels
 		for (int dest = y * SCRWIDTH, x = 0; x < SCRWIDTH; x++)
-			screen->pixels[dest + x] =
-			RGBF32_to_RGB8( &accumulator[x + y * SCRWIDTH] );
+		{
+			screen->pixels[dest + x] = accum[dest + x];
+			//RGBF32_to_RGB8( &accumulator[x + y * SCRWIDTH] );
+			//printf("%d %d %d\n", x, y, screen->pixels[dest + x]);
+		}
+			
 	}
 	// performance report - running average - ms, MRays/s
 	avg = (1 - alpha) * avg + alpha * t.elapsed() * 1000;

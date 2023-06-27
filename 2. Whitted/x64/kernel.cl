@@ -1,18 +1,20 @@
 #define INFTY		1e34f
 #define PI			3.14159265358979323846264f
+#define INVPI		0.31830988618379067153777f
 #define SCRWIDTH	1024
 #define SCRHEIGHT	640
 
+#define EPSILON		0.0001f
+#define MAXDEPTH	7 // live wild
 
 #define FOURLIGHTS
 #define USEBVH
 
-#define PLANE_X(o,i) {float t=-(ray.O.x+o)*ray.rD.x;if(t<ray.t&&t>0)ray.t=t,ray.objIdx=i;}
-#define PLANE_Y(o,i) {float t=-(ray.O.y+o)*ray.rD.y;if(t<ray.t&&t>0)ray.t=t,ray.objIdx=i;}
-#define PLANE_Z(o,i) {float t=-(ray.O.z+o)*ray.rD.z;if(t<ray.t&&t>0)ray.t=t,ray.objIdx=i;}
+#define PLANE_X(o,i) {float t=-(ray->O.x+o)*ray->rD.x;if(t<ray->t&&t>0)ray->t=t,ray->objIdx=i;}
+#define PLANE_Y(o,i) {float t=-(ray->O.y+o)*ray->rD.y;if(t<ray->t&&t>0)ray->t=t,ray->objIdx=i;}
+#define PLANE_Z(o,i) {float t=-(ray->O.z+o)*ray->rD.z;if(t<ray->t&&t>0)ray->t=t,ray->objIdx=i;}
 
 float3 camPos, topLeft, topRight, bottomLeft;
-struct Surface logo, red, blue;
 
 struct test
 {
@@ -141,7 +143,6 @@ struct mat4 Inverted( struct mat4 a )
 	}
 	return retVal;
 }
-
 float3 TransformPosition( float3 b, struct mat4 a )
 {
 	float3 result;
@@ -158,6 +159,15 @@ float3 TransformVector( float3 b, struct mat4 a )
 	result.z = a.cell[8] * b.x + a.cell[9] * b.y + a.cell[10] * b.z;
 	return result;
 }
+inline uint RGBF32_to_RGB8( float3 v )
+{
+	uint r = (uint)(255.0f * min( 1.0f, v.x ));
+	uint g = (uint)(255.0f * min( 1.0f, v.y ));
+	uint b = (uint)(255.0f * min( 1.0f, v.z ));
+	return (r << 16) + (g << 8) + b;
+}
+inline float3 reflect( float3 i, float3 n ) { return i - 2.0f * n * dot( n, i ); }
+
 
 struct Ray
 {
@@ -167,8 +177,7 @@ struct Ray
 	int objIdx;
 	bool inside; // true when in medium
 };
-
-struct Ray GetRay(const float3 origin, const float3 direction, const float distance, const int idx)
+struct Ray GetRay(float3 origin, float3 direction, float distance, int idx)
 {
 	struct Ray ray;
 	ray.O = origin;
@@ -179,7 +188,6 @@ struct Ray GetRay(const float3 origin, const float3 direction, const float dista
 	ray.rD.x = 1 / ray.D.x, ray.rD.y = 1 / ray.D.y, ray.rD.z = 1 / ray.D.z;
 	return ray;
 }
-
 struct Ray GetPrimaryRay(float x, float y) 
 {
 	// calculate pixel position on virtual screen plane
@@ -189,6 +197,7 @@ struct Ray GetPrimaryRay(float x, float y)
 
 	return GetRay(camPos, normalize( P - camPos ), INFTY, -1);
 }
+
 
 struct Sphere
 {
@@ -243,11 +252,6 @@ float3 GetAlbedoSphere( struct Sphere *sphere, float3 I)
 	return 0.93f;
 }
 
-
-struct Surface
-{
-	uint pixels[300000];
-};
 struct Plane
 {
 	float3 N;
@@ -260,6 +264,7 @@ struct Plane GetPlane( int idx, float3 normal, float dist )
 	plane.N = normal;
 	plane.d = dist;
 	plane.objIdx = idx;
+	return plane;
 }
 void IntersectPlane(struct Plane *plane, struct Ray *ray)
 {
@@ -270,8 +275,9 @@ float3 GetNormalPlane(struct Plane *plane, float3 I)
 {
 	return plane->N;
 }
-float3 GetAlbedoPlane(struct Plane *plane, float3 I)
+float3 GetAlbedoPlane(struct Plane *plane, float3 I, uint* logo, uint* red, uint* blue)
 {
+	//printf("%d\n", plane->objIdx);
 	if (plane->N.y == 1)
 	{
 		// floor albedo: checkerboard
@@ -287,7 +293,7 @@ float3 GetAlbedoPlane(struct Plane *plane, float3 I)
 	{
 		// back wall: logo
 		int ix = (int)((I.x + 4) * (128.0f / 8)), iy = (int)((2 - I.y) * (64.0f / 3));
-		uint p = logo.pixels[(ix & 127) + (iy & 63) * 128];
+		uint p = logo[(ix & 127) + (iy & 63) * 128];
 		float3 i3;
 		i3.x = (p >> 16) & 255;
 		i3.y = (p >> 8) & 255;
@@ -298,7 +304,7 @@ float3 GetAlbedoPlane(struct Plane *plane, float3 I)
 	{
 		// left wall: red
 		int ix = (int)((I.z - 4) * (512.0f / 7)), iy = (int)((2 - I.y) * (512.0f / 3));
-		uint p = red.pixels[(ix & 511) + (iy & 511) * 512];
+		uint p = red[(ix & 511) + (iy & 511) * 512];
 		float3 i3;
 		i3.x = (p >> 16) & 255;
 		i3.y = (p >> 8) & 255;
@@ -309,7 +315,7 @@ float3 GetAlbedoPlane(struct Plane *plane, float3 I)
 	{
 		// right wall: blue
 		int ix = (int)((I.z - 4) * (512.0f / 7)), iy = (int)((2 - I.y) * (512.0f / 3));
-		uint p = blue.pixels[(ix & 511) + (iy & 511) * 512];
+		uint p = blue[(ix & 511) + (iy & 511) * 512];
 		float3 i3;
 		i3.x = (p >> 16) & 255;
 		i3.y = (p >> 8) & 255;
@@ -511,7 +517,9 @@ void IntersectTorus( struct Torus *torus, struct Ray *ray )
 	// solve quadratic equation
 	if (fabs( k3 * (k32 - k2) + k1 ) < 0.0001)
 	{
-		swap( k1, k3 );
+		double temp = k1;
+		k1 = k3;
+		k3 = temp;
 		po = -1, k0 = 1 / k0, k1 = k1 * k0, k2 = k2 * k0, k3 = k3 * k0, k32 = k3 * k3;
 	}
 	double c2 = 2 * k2 - 3 * k32, c1 = k3 * (k32 - k2) + k1;
@@ -578,7 +586,9 @@ bool IsOccludedTorus( struct Torus *torus, struct Ray *ray )
 	// solve quadratic equation
 	if (fabs( k3 * (k32 - k2) + k1 ) < 0.01f)
 	{
-		swap( k1, k3 );
+		double temp = k1;
+		k1 = k3;
+		k3 = temp;
 		po = -1, k0 = 1 / k0, k1 = k1 * k0, k2 = k2 * k0, k3 = k3 * k0, k32 = k3 * k3;
 	}
 	float c2 = 2 * k2 - 3 * k32, c1 = k3 * (k32 - k2) + k1;
@@ -593,7 +603,7 @@ bool IsOccludedTorus( struct Torus *torus, struct Ray *ray )
 	}
 	else
 	{
-		const float sQ = cbrtf( sqrt( h ) + fabs( R ) ); // powf( sqrt( h ) + fabs( R ), 0.3333333f );
+		const float sQ = cbrt( sqrt( h ) + fabs( R ) ); // powf( sqrt( h ) + fabs( R ), 0.3333333f );
 		z = copysign( fabs( sQ + Q / sQ ), R );
 	}
 	z = c2 - z;
@@ -633,7 +643,7 @@ float3 GetNormalTorus( struct Torus *torus, float3 I )
 	float3 N = normalize( L * (dot( L, L ) - torus->rt2 - torus->rc2 * temp) );
 	return TransformVector( N, torus->T );
 }
-float3 GetAlbedo( struct Torus torus, float3 I )
+float3 GetAlbedoTorus( struct Torus *torus, float3 I )
 {
 	return 1 ; // material.albedo;
 }
@@ -649,46 +659,259 @@ struct Cube cube;
 struct Plane plane[6];
 struct Torus torus;
 
-__kernel void Trace(float t, __global uint* accumulator,  __global float* camera_params, __global uint* pixels_logo, __global uint* pixels_red, __global uint* pixels_blue)
+float3 GetLightPos()
+{
+#ifndef FOURLIGHTS
+	// light point position is the middle of the swinging quad
+	float3 b1, b2, offset;
+	b1.x = -0.5f, b1.y = 0, b1.z = -0.5f;
+	b2.x = 0.5f, b2.y = 0, b2.z = 0.5f;
+	offset.x = 0, offset.y = 0.01f, offset.z = 0;
+	float3 corner1 = TransformPosition( b1, quad.T );
+	float3 corner2 = TransformPosition( b2, quad.T );
+	return (corner1 + corner2) * 0.5f - offset;
+#else
+	// function is not valid when using four lights; we'll return the origin
+	return 0;
+#endif
+}
+float3 GetLightColor()
+{
+	float3 color;
+	color.x = 24, color.y = 24, color.z = 22;
+	return color;
+}
+void FindNearest( struct Ray *ray )
+{
+	// room walls - ugly shortcut for more speed
+	if (ray->D.x < 0) PLANE_X( 3, 4 ) else PLANE_X( -2.99f, 5 );
+	if (ray->D.y < 0) PLANE_Y( 1, 6 ) else PLANE_Y( -2, 7 );
+	if (ray->D.z < 0) PLANE_Z( 3, 8 ) else PLANE_Z( -3.99f, 9 );
+#ifdef FOURLIGHTS
+	for (int i = 0; i < 4; i++) IntersectQuad( &quad[i], ray );
+#else
+	IntersectQuad( &quad, ray );
+#endif
+	IntersectSphere( &sphere, ray );
+	IntersectSphere( &sphere2, ray );
+	IntersectCube( &cube, ray );
+	IntersectTorus( &torus, ray );
+}
+bool IsOccluded( struct Ray *ray )
+{
+	if (IsOccludedCube( &cube, ray )) return true;
+	if (IsOccludedSphere( &sphere, ray )) return true;
+#ifdef FOURLIGHTS
+	for (int i = 0; i < 4; i++) if (IsOccludedQuad( &quad[i], ray )) return true;
+#else
+	if (IsOccludedQuad( &quad, ray )) return true;
+#endif
+	if (IsOccludedTorus( &torus, ray )) return true;
+	return false; // skip planes and rounded corners
+}
+float3 GetNormal( int objIdx, float3 I, float3 wo )
+{
+	// we get the normal after finding the nearest intersection:
+	// this way we prevent calculating it multiple times.
+	if (objIdx == -1) return 0; // or perhaps we should just crash
+	float3 N;
+#ifdef FOURLIGHTS
+	if (objIdx == 0) N = GetNormalQuad( &quad[0], I ); // they're all oriented the same
+#else
+	if (objIdx == 0) N = GetNormalQuad( &quad, I );
+#endif
+	else if (objIdx == 1) N = GetNormalSphere( &sphere, I );
+	else if (objIdx == 2) N = GetNormalSphere( &sphere2, I );
+	else if (objIdx == 3) N = GetNormalCube( &cube, I );
+	else if (objIdx == 10) N = GetNormalTorus( &torus, I );
+	else
+	{
+		// faster to handle the 6 planes without a call to GetNormal
+		N = 0;
+		N[(objIdx - 4) / 2] = 1 - 2 * (float)(objIdx & 1);
+	}
+	if (dot( N, wo ) > 0) N = -N; // hit backside / inside
+	return N;
+}
+float3 GetAlbedo( int objIdx, float3 I, uint* logo, uint* red, uint* blue )
+{
+	if (objIdx == -1) return 0; // or perhaps we should just crash
+#ifdef FOURLIGHTS
+	if (objIdx == 0) return GetAlbedoQuad( &quad[0], I ); // they're all the same
+#else
+	if (objIdx == 0) return GetAlbedoQuad( &quad, I );
+#endif
+	if (objIdx == 1) return GetAlbedoSphere( &sphere, I );
+	if (objIdx == 2) return GetAlbedoSphere( &sphere2, I );
+	if (objIdx == 3) return GetAlbedoCube( &cube, I );
+	if (objIdx == 10) return GetAlbedoTorus( &torus, I );
+	return GetAlbedoPlane( &plane[objIdx - 4], I, logo, red, blue );
+	// once we have triangle support, we should pass objIdx and the bary-
+	// centric coordinates of the hit, instead of the intersection location.
+}
+float GetReflectivity( int objIdx, float3 I )
+{
+	if (objIdx == 1 /* ball */) return 1;
+	if (objIdx == 6 /* floor */) return 0.3f;
+	return 0;
+}
+float GetRefractivity( int objIdx, float3 I )
+{
+	return (objIdx == 3 || objIdx == 10) ? 1.0f : 0.0f;
+}
+float3 GetAbsorption( int objIdx )
+{
+	float3 glass;
+	glass.x = 0.5f, glass.y = 0, glass.z = 0.5f;
+	return objIdx == 3 ? glass : 0;
+}
+
+float3 DirectIllumination( float3 I, float3 N )
+{
+	// sum irradiance from light sources
+	float3 irradiance = 0;
+	// query the (only) scene light
+	float3 pointOnLight = GetLightPos();
+	float3 L = pointOnLight - I;
+	float distance = length( L );
+	L *= 1 / distance;
+	float ndotl = dot( N, L );
+	if (ndotl < EPSILON) /* we don't face the light */ return 0;
+	// cast a shadow ray
+	struct Ray s = GetRay( I + L * EPSILON, L, distance - 2 * EPSILON , -1);
+	if (!IsOccluded( &s ))
+	{
+		// light is visible; calculate irradiance (= projected radiance)
+		float attenuation = 1 / (distance * distance);
+		float3 in_radiance = GetLightColor() * attenuation;
+		irradiance = in_radiance * dot( N, L );
+	}
+	return irradiance;
+}
+
+__kernel void Trace(float t, __global uint* accumulator,  __global float* camera_params, __global uint* logo, __global uint* red, __global uint* blue)
 {
 	camPos.x = camera_params[0], camPos.y = camera_params[1], camPos.z = camera_params[2];
 	topLeft.x = camera_params[3], topLeft.y = camera_params[4], topLeft.z = camera_params[5];
 	topRight.x = camera_params[6], topRight.y = camera_params[7], topRight.z = camera_params[8];
 	bottomLeft.x = camera_params[9], bottomLeft.y = camera_params[10], bottomLeft.z = camera_params[11];
-
-	int i;
-	uint size_logo = sizeof( pixels_logo ), size_red = sizeof( pixels_red ), size_blue = sizeof( pixels_blue );
-	for(i = 0; i < size_logo; i++) logo.pixels[i] = pixels_logo[i];
-	for(i = 0; i < size_red; i++) red.pixels[i] = pixels_red[i];
-	for(i = 0; i < size_blue; i++) blue.pixels[i] = pixels_blue[i];
 	 
 	int idx = get_global_id( 0 );
-	int idy = get_global_id( 1 );
+	int x = idx % SCRWIDTH, y = idx / SCRWIDTH;
 
-	struct Ray ray = GetPrimaryRay(idx, idy);
+	struct Ray ray = GetPrimaryRay(x, y);
 
 	struct mat4 identity = Identity();
 
-	float3 pos;
+	float3 pos, norm;
 
 		// we store all primitives in one continuous buffer
 #ifdef FOURLIGHTS
 	for (int i = 0; i < 4; i++) quad[i] = GetQuad( 0, 0.5f, identity );	// 0: four light sources
 #else
-	quad = Quad( 0, 1 );									// 0: light source
+	quad = Quad( 0, 1 );														// 0: light source
 #endif
-	sphere = GetSphere( 1, 0, 0.6f );				// 1: bouncing ball
+	sphere = GetSphere( 1, 0, 0.6f );											// 1: bouncing ball
 	pos.x = 0, pos.y = 2.5f, pos.z = -3.07f; sphere2 = GetSphere( 2, pos, 8 );	// 2: rounded corners
-	cube = GetCube( 3, 0, 1.15f, identity );			// 3: cube
-	pos.x = 1, pos.y = 0,pos.z = 0; plane[0] = GetPlane( 4, pos, 3 );			// 4: left wall
-	pos.x = -1, pos.y = 0, pos.z = 0; plane[1] = GetPlane( 5, pos, 2.99f );		// 5: right wall
-	pos.x = 0, pos.y = 1, pos.z = 0; plane[2] = GetPlane( 6, pos, 1 );			// 6: floor
-	pos.x = 0, pos.y = -1, pos.z = 0; plane[3] = GetPlane( 7, pos, 2 );			// 7: ceiling
-	pos.x = 0, pos.y = 0, pos.z = 1; plane[4] = GetPlane( 8, pos, 3 );			// 8: front wall
-	pos.x = 0, pos.y = 0, pos.z = -1; plane[5] = GetPlane( 9, pos, 3.99f );		// 9: back wall
-	torus = GetTorus( 10, 0.8f, 0.25f );						// 10: torus
+	cube = GetCube( 3, 0, 1.15f, identity );									// 3: cube
+	norm.x = 1, norm.y = 0,norm.z = 0; plane[0] = GetPlane( 4, norm, 3 );			// 4: left wall
+	//printf("%f, %f, %f\n", plane[0].N.x, plane[0].N.y, plane[0].N.z);
+	norm.x = -1, norm.y = 0, norm.z = 0; plane[1] = GetPlane( 5, norm, 2.99f );		// 5: right wall
+	norm.x = 0, norm.y = 1, norm.z = 0; plane[2] = GetPlane( 6, norm, 1 );			// 6: floor
+	norm.x = 0, norm.y = -1, norm.z = 0; plane[3] = GetPlane( 7, norm, 2 );			// 7: ceiling
+	norm.x = 0, norm.y = 0, norm.z = 1; plane[4] = GetPlane( 8, norm, 3 );			// 8: front wall
+	norm.x = 0, norm.y = 0, norm.z = -1; plane[5] = GetPlane( 9, norm, 3.99f );		// 9: back wall
+	torus = GetTorus( 10, 0.8f, 0.25f );										// 10: torus
 	torus.T = mat4Mul( Translate( -0.25f, 0, 2), RotateX( PI / 4 ) );
 	torus.invT = Inverted( torus.T );
 
-	bool flag = IsOccludedSphere( &sphere, &ray);
+	
+
+	float3 accumulated_radiance = 0;
+    float3 medium_scale = 1;
+
+    for (int i = 0; i < MAXDEPTH; ++i)
+    {
+        // Intersect the ray with the scene
+        FindNearest( &ray );
+        if (ray.objIdx == -1) /* ray left the scene */
+            break;
+
+        if (i > MAXDEPTH) /* bounded too many times */
+            break;
+
+        // Gather shading data
+        float3 I = ray.O + ray.t * ray.D;
+        float3 N = GetNormal(ray.objIdx, I, ray.D);
+        float3 albedo = GetAlbedo(ray.objIdx, I, logo, red, blue);
+        float reflectivity = GetReflectivity(ray.objIdx, I);
+        float refractivity = GetRefractivity(ray.objIdx, I);
+        float diffuseness = 1 - (reflectivity + refractivity);
+
+        // Do whitted
+        float3 out_radiance = 0;
+
+        // Handle pure speculars such as mirrors
+        if (reflectivity > 0)
+        {
+            float3 R = reflect(ray.D, N);
+            struct Ray r = GetRay(I + R * EPSILON, R, INFTY, -1);
+            ray = r;
+            accumulated_radiance += reflectivity * albedo * out_radiance;
+            continue;
+        }
+
+        // Handle dielectrics such as glass / water
+        if (refractivity > 0)
+        {
+            float3 R = reflect(ray.D, N);
+            struct Ray r = GetRay(I + R * EPSILON, R, INFTY, -1);
+            float n1 = ray.inside ? 1.2f : 1, n2 = ray.inside ? 1 : 1.2f;
+            float eta = n1 / n2, cosi = dot(-ray.D, N);
+            float cost2 = 1.0f - eta * eta * (1 - cosi * cosi);
+            float Fr = 1;
+            if (cost2 > 0)
+            {
+                float a = n1 - n2, b = n1 + n2, R0 = (a * a) / (b * b), c = 1 - cosi;
+                Fr = R0 + (1 - R0) * (c * c * c * c * c);
+                float3 T = eta * ray.D + ((eta * cosi - sqrt(fabs(cost2))) * N);
+                struct Ray t = GetRay(I + T * EPSILON, T, INFTY, -1);
+                t.inside = !ray.inside;
+                ray = t;
+                accumulated_radiance += albedo * (1 - Fr) * out_radiance;
+                continue;
+            }
+            accumulated_radiance += albedo * Fr * out_radiance;
+        }
+
+        // Handle diffuse surfaces
+        if (diffuseness > 0)
+        {
+            // Calculate illumination
+            float3 irradiance = DirectIllumination(I, N);
+            // We don't account for diffuse interreflections: approximate
+            float3 ambient = 0.2f;
+            // Calculate reflected radiance using Lambert brdf
+            float3 brdf = albedo * INVPI;
+            accumulated_radiance += diffuseness * brdf * (irradiance + ambient);
+        }
+
+        // Apply absorption if we traveled through a medium
+        if (ray.inside)
+        {
+            float3 absorption;
+			absorption.x = 0.5f, absorption.y = 0, absorption.z = 0.5f; // scene.GetAbsorption( objIdx );
+            medium_scale.x = exp(absorption.x * - ray.t);
+            medium_scale.y = exp(absorption.y * - ray.t);
+            medium_scale.z = exp(absorption.z * - ray.t);
+        }
+
+        break;
+    }
+
+	uint color = RGBF32_to_RGB8(medium_scale * accumulated_radiance);
+	//if(ray.objIdx != -1)printf("After: %d, %d, %d, %d\n", x, y, ray.objIdx, color);
+
+    accumulator[idx] = RGBF32_to_RGB8(medium_scale * accumulated_radiance);
+	
 }
